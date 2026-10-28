@@ -4,10 +4,13 @@ Motore Python indipendente dal gestionale. Legge esclusivamente uno snapshot SQL
 autonomo e restituisce un report JSON. Nessuna integrazione con Panoramica,
 Contratti, Monitoraggio o Cartella Tecnica è inclusa.
 
+Versione 1.0.2: aggiunto lo strumento guidato `crea_copia_collaudo_windows.bat`
+per preparare uno snapshot autonomo e il rapporto della struttura del database.
+
 Versione 1.0.1: chiusura esplicita delle connessioni dei database temporanei nei
 test, per consentire la pulizia su Windows. Un test di regressione mantiene gli
 handle referenziati e ne verifica la chiusura prima di eliminare i file, anche
-quando una query del motore fallisce. La suite contiene 15 test.
+quando una query del motore fallisce.
 Il file `test_windows.bat` si può aprire con doppio clic: la finestra resta aperta
 per mostrare il risultato fino alla pressione di un tasto.
 
@@ -35,6 +38,35 @@ Installazione opzionale come pacchetto: `python -m pip install .`; poi usare
 Senza `--output`, il JSON viene scritto sullo standard output. Un errore operativo
 restituisce codice 1; le anomalie dei dati sono nel report e non sono errori di avvio.
 I file di destinazione esistenti non vengono sovrascritti.
+
+## Preparare la copia sul PC Windows
+
+Aprire con doppio clic `crea_copia_collaudo_windows.bat`. Scegliere il database
+nella finestra di selezione e attendere la creazione della copia. La cartella
+iniziale proposta corrisponde al percorso individuato sul PC durante il collaudo;
+la selezione resta manuale e può puntare a un'altra posizione.
+
+Lo strumento usa la backup API SQLite con sorgente aperta `mode=ro` e
+`query_only=ON`, così legge anche i dati committati nel WAL. Le scritture avvengono
+sulla nuova copia. Verifica lo spazio disponibile e la copia con `quick_check`,
+chiude tutte le connessioni e crea una nuova cartella univoca sul Desktop con:
+
+- `snapshot.sqlite`: copia completa dei dati, da conservare sul PC.
+- `schema_collaudo.json`: soli nomi di tabelle/viste, colonne, tipi e chiavi, da
+  fornire per la preparazione della mappatura. Non contiene righe, valori di
+  default o definizioni SQL. Anche i nomi degli oggetti restano visibili: si può
+  controllare il rapporto prima di condividerlo.
+
+La finestra resta utilizzabile durante la copia e consente di annullarla. Dopo
+10 minuti l'operazione si interrompe. In caso di errore o annullamento rimuove
+solo la nuova cartella incompleta; eventuali errori di pulizia mostrano il percorso
+residuo. Non sovrascrive copie precedenti e non carica file su Internet.
+Su altri sistemi il modulo espone anche la funzione Python `prepare_snapshot`.
+La GUI richiede Tkinter, incluso nell'installazione completa di Python per Windows.
+
+Il rapporto serve per stabilire lo schema reale: non dimostra ancora che la
+sorgente selezionata sia quella effettivamente utilizzata dall'applicazione o che
+le telemetrie soddisfino il contratto V1.
 
 ## Contratto dello snapshot e mappatura
 

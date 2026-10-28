@@ -1,0 +1,17 @@
+SU PRINT INTELLIGENCE - PREPARAZIONE DELLA COPIA DI COLLAUDO
+
+1. Estrai tutto il contenuto di questo ZIP in una nuova cartella.
+2. Apri con doppio clic crea_copia_collaudo_windows.bat.
+3. Nella finestra seleziona su_print_intelligence.db e premi Apri.
+4. Attendi il messaggio Copia pronta, poi premi OK.
+5. Nella cartella che si apre trovi:
+   - schema_collaudo.json: il piccolo rapporto da allegare in chat;
+   - snapshot.sqlite: la copia completa, da conservare sul tuo PC.
+
+Il rapporto contiene la struttura del database, senza record o valori di default.
+Lo strumento legge la sorgente in sola lettura e usa il backup SQLite per creare
+una copia coerente, inclusi eventuali dati committati nel WAL.
+
+Python 3.11 deve essere installato. Lo strumento non richiede librerie esterne
+e non carica file in rete. Le integrazioni con il gestionale restano sospese
+fino al collaudo sullo schema reale.
