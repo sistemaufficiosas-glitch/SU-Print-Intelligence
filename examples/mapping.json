@@ -1,0 +1,22 @@
+{
+  "printers": {
+    "table": "printers",
+    "id": "id",
+    "serial": "serial"
+  },
+  "agents": {
+    "table": "remote_agents",
+    "id": "id",
+    "printer_id": "printer_id",
+    "serial": "serial"
+  },
+  "readings": {
+    "table": "telemetry",
+    "id": "id",
+    "agent_id": "agent_id",
+    "serial": "serial",
+    "timestamp": "observed_at",
+    "total": "total_counter",
+    "valid": "is_valid"
+  }
+}
