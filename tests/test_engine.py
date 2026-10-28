@@ -6,8 +6,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from su_print_counters import collect
 from su_print_counters.engine import DEFAULT_MAPPING
@@ -18,7 +20,7 @@ class CollectionTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.db = Path(self.tmp.name) / "snapshot.sqlite"
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             conn.executescript('''
                 CREATE TABLE printers(id INTEGER PRIMARY KEY, serial TEXT);
                 CREATE TABLE remote_agents(id INTEGER PRIMARY KEY, printer_id INTEGER, serial TEXT);
@@ -29,7 +31,7 @@ class CollectionTests(unittest.TestCase):
             ''')
 
     def reading(self, rid, total=100, day=1, agent=10, serial="SN-001", valid=1, when=None):
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             conn.execute("INSERT INTO telemetry VALUES(?,?,?,?,?,?)", (rid, agent, serial, when or f"2026-01-{day:02d}T10:00:00Z", total, valid))
 
     def run_collect(self):
@@ -56,7 +58,7 @@ class CollectionTests(unittest.TestCase):
         self.assertIn("SERIAL_MISMATCH", self.codes(report))
 
     def test_discordant_agent_excluded(self):
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             conn.execute("UPDATE remote_agents SET serial='OTHER' WHERE id=10")
         self.reading(1)
         report = self.run_collect()
@@ -64,7 +66,7 @@ class CollectionTests(unittest.TestCase):
         self.assertIn("SERIAL_MISMATCH", self.codes(report))
 
     def test_duplicate_serials_excluded(self):
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             conn.execute("INSERT INTO printers VALUES(4,' sn-001 ')")
         self.reading(1)
         report = self.run_collect()
@@ -120,7 +122,7 @@ class CollectionTests(unittest.TestCase):
 
     def test_mapping_and_sql_identifier_guard(self):
         mapping = json.loads(json.dumps(DEFAULT_MAPPING))
-        with sqlite3.connect(self.db) as conn:
+        with closing(sqlite3.connect(self.db)) as conn, conn:
             conn.execute("ALTER TABLE telemetry RENAME TO samples")
         mapping["readings"]["table"] = "samples"
         path = Path(self.tmp.name) / "mapping.json"
@@ -149,6 +151,41 @@ class CollectionTests(unittest.TestCase):
         run = subprocess.run(base + [str(self.db)], env=env, capture_output=True, text=True)
         self.assertEqual(run.returncode, 1)
         self.assertEqual(before, self.db.read_bytes())
+
+
+class ConnectionLifetimeTests(unittest.TestCase):
+    def test_fixture_and_engine_release_database_handles(self):
+        # Mantenere riferimenti impedisce al GC di nascondere handle aperti su Linux.
+        original_connect = sqlite3.connect
+        opened = []
+
+        def tracked_connect(*args, **kwargs):
+            connection = original_connect(*args, **kwargs)
+            opened.append(connection)
+            return connection
+
+        fixture = CollectionTests("test_history_latest_and_exclusions")
+        try:
+            with patch("sqlite3.connect", side_effect=tracked_connect):
+                fixture.setUp()
+                fixture.test_history_latest_and_exclusions()
+                # Anche un errore SQL deve rilasciare il file della sorgente.
+                connection = original_connect(fixture.db)
+                try:
+                    connection.execute("ALTER TABLE telemetry RENAME TO other_samples")
+                    connection.commit()
+                finally:
+                    connection.close()
+                with self.assertRaises(sqlite3.OperationalError):
+                    fixture.run_collect()
+            self.assertTrue(opened)
+            for connection in opened:
+                with self.assertRaises(sqlite3.ProgrammingError):
+                    connection.execute("SELECT 1")
+        finally:
+            for connection in opened:
+                connection.close()
+            fixture.doCleanups()
 
 
 if __name__ == "__main__":

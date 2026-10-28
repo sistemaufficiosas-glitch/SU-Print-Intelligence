@@ -4,6 +4,13 @@ Motore Python indipendente dal gestionale. Legge esclusivamente uno snapshot SQL
 autonomo e restituisce un report JSON. Nessuna integrazione con Panoramica,
 Contratti, Monitoraggio o Cartella Tecnica è inclusa.
 
+Versione 1.0.1: chiusura esplicita delle connessioni dei database temporanei nei
+test, per consentire la pulizia su Windows. Un test di regressione mantiene gli
+handle referenziati e ne verifica la chiusura prima di eliminare i file, anche
+quando una query del motore fallisce. La suite contiene 15 test.
+Il file `test_windows.bat` si può aprire con doppio clic: la finestra resta aperta
+per mostrare il risultato fino alla pressione di un tasto.
+
 ## Avvio
 
 Richiede Python 3.11 o successivo; non usa librerie esterne in esecuzione.
