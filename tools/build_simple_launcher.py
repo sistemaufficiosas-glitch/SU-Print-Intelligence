@@ -20,9 +20,10 @@ HEADER = (
     'exit /b %SU_CRC_EXIT%\r\n'
 )
 ENTRY = 'from su_print_counters.acceptance import main\nraise SystemExit(main(automatic=True))\n'
+SOURCE_ENTRY = 'from su_print_counters.prepare_integration import main\nraise SystemExit(main())\n'
 
 
-def build(output, source_root=None):
+def build(output, source_root=None, *, entry=ENTRY):
     root = Path(source_root) if source_root else Path(__file__).resolve().parents[1]
     package = root / "src" / "su_print_counters"
     files = sorted(package.glob("*.py"))
@@ -31,7 +32,7 @@ def build(output, source_root=None):
     output = Path(output)
     output.write_bytes(HEADER.encode("ascii"))
     with ZipFile(output, "a", compression=ZIP_DEFLATED, compresslevel=9) as archive:
-        entries = [("__main__.py", ENTRY.encode("utf-8"))]
+        entries = [("__main__.py", entry.encode("utf-8"))]
         entries += [("su_print_counters/" + file.name, file.read_bytes()) for file in files]
         for name, data in entries:
             info = ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
@@ -45,6 +46,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("output", nargs="?", default="AVVIA_CONTATORI.bat")
+    parser.add_argument("output", nargs="?")
+    parser.add_argument("--sources", action="store_true", help="Prepara l'avvio per i soli sorgenti della Panoramica")
     args = parser.parse_args()
-    print(build(args.output))
+    output = args.output or ("PREPARA_PANORAMICA.bat" if args.sources else "AVVIA_CONTATORI.bat")
+    print(build(output, entry=SOURCE_ENTRY if args.sources else ENTRY))

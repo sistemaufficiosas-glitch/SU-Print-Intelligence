@@ -1,8 +1,8 @@
-# Verifiche della versione 1.1.4
+# Verifiche della versione 1.1.5
 
 ## Test automatici
 
-La suite completa contiene 149 test eseguiti con successo nell'ambiente Linux.
+La suite completa contiene 160 test eseguiti con successo nell'ambiente Linux.
 Include il contratto di riferimento, backup WAL, diagnostica, indice dei sorgenti,
 adattatore reale, CLI e generazione dei rapporti. I controlli SQLite conservano
 riferimenti alle connessioni per rilevare handle lasciati aperti anche su Linux;
@@ -47,6 +47,12 @@ Tre ulteriori casi GUI coprono il selettore quando nessun file è trovato,
 l'annullamento e la validazione effettiva della scelta. La pipeline completa
 sintetica usa una cartella rinominata e controlla ancora ZIP e database invariato.
 
+La preparazione Panoramica aggiunge dieci test del raccoglitore di sorgenti:
+allowlist, esclusione di dati e credenziali, nessuna esecuzione dei moduli letti,
+impronte invariate, collegamenti, annullamento, limiti e modifiche concorrenti.
+Un ulteriore test avvia isolatamente l'archivio incorporato e verifica che usi
+la preparazione sorgenti e non il collaudo dei contatori o i moduli del gestionale.
+
 ## Prova rappresentativa di capacità
 
 Con la versione 1.1.0 è stata eseguita la pipeline SQLite → adattatore → quattro file su
@@ -77,8 +83,16 @@ conferma che il Desktop controllato corrisponde al percorso mostrato in Esplora
 file. Il nome della cartella visibile è compatibile con il filtro precedente;
 la causa esatta dello zero candidati resta da accertare. La 1.1.4 sostituisce
 quel filtro con la ricerca dei file, senza interpretare date nel nome delle
-cartelle. Deve ancora essere eseguita sul PC. Il completamento del flusso
-automatico e l'apertura effettiva di Explorer restano da verificare. I test GUI
-verificano il flusso con componenti simulati.
+cartelle. Dopo questa consegna è stato ricevuto un nuovo ZIP di risultati da una
+copia aggiornata: gli storici precedenti sono preservati e il confronto fisico
+ritrova esattamente i valori fotografati in letture Agent. Un invio successivo
+in regressione viene scartato mantenendo la lettura valida. Il funzionamento
+autonomo è quindi collaudato con i limiti documentati sui dati. Il completamento
+del flusso della GUI viene dedotto dalla ricezione dello ZIP; non è una verifica
+visiva di tutti i pulsanti nativi. I test GUI usano componenti simulati.
+
+L'integrazione Panoramica non è implementata: il repository non contiene i
+sorgenti dell'interfaccia originale. Il nuovo raccoglitore deve ancora essere
+eseguito sul PC per acquisirli; i sorgenti ricevuti rimarranno privati.
 
 Nessuna integrazione o modifica del database operativo è stata eseguita.

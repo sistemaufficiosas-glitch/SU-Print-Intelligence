@@ -1,3 +1,4 @@
 # Avvio Windows con ZIP Python incorporato: conservare ogni byte e i CRLF iniziali.
 AVVIA_COLLAUDO*.bat -text
 AVVIA_CONTATORI.bat -text
+PREPARA_PANORAMICA.bat -text

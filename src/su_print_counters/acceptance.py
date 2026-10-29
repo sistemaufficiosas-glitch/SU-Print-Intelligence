@@ -234,9 +234,13 @@ def _open_output(root, path):
 
 def show_support_archive(root, folder):
     """Mostra il solo file da allegare, senza eseguire comandi tramite shell."""
+    show_file_in_explorer(root, Path(folder) / "supporto_collaudo.zip")
+
+
+def show_file_in_explorer(root, target):
     from tkinter import messagebox
 
-    target = Path(folder) / "supporto_collaudo.zip"
+    target = Path(target)
     if os.name == "nt":
         try:
             subprocess.Popen(["explorer.exe", "/select,", str(target)])

@@ -4,10 +4,10 @@ Motore Python indipendente dal gestionale. Legge esclusivamente uno snapshot SQL
 autonomo e restituisce un report JSON. Nessuna integrazione con Panoramica,
 Contratti, Monitoraggio o Cartella Tecnica è inclusa.
 
-Versione 1.1.4: avvio Windows in un solo file, con ricerca diretta dei file della
-copia anche nelle sottocartelle, indipendentemente dal nome della cartella.
-Mantiene scelta automatica, apertura del file di supporto già selezionato,
-dettagli delle anomalie, controllo delle letture parziali e archivio compresso.
+Versione 1.1.5: aggiunge un avvio per raccogliere i soli sorgenti del gestionale
+necessari a preparare l'integrazione con Panoramica. Mantiene il motore autonomo,
+la ricerca delle copie e i rapporti del collaudo. L'integrazione non è ancora
+implementata: nel repository mancano i sorgenti dell'interfaccia originale.
 
 Adattatore del registro reale Remote Agent, ricavato dallo schema,
 dalla diagnostica e dai sorgenti di ricezione forniti per la revisione. Il risultato
@@ -16,6 +16,27 @@ resta `REVIEW_REQUIRED` fino al confronto delle letture con casi noti. Vedere
 
 Il file `test_windows.bat` si può aprire con doppio clic: la finestra resta aperta
 per mostrare il risultato fino alla pressione di un tasto.
+
+## Preparare l'integrazione con Panoramica
+
+Il collaudo funzionale del motore autonomo è concluso: test automatici, due
+rapporti di copie reali e un confronto fisico su una macchina hanno verificato
+le regole e il mantenimento dell'ultima lettura valida dopo una successiva
+telemetria in regressione. Questo non certifica fisicamente tutti i contatori
+o la provenienza di tutti i totali. Le anomalie restano nel rapporto.
+
+Per modificare la Panoramica occorre il suo codice effettivo: i tre servizi
+originali ricevuti non contengono l'interfaccia né identificano il framework.
+Aprire `PREPARA_PANORAMICA.bat`: raccoglie staticamente i sorgenti dalla cartella
+del programma individuata tramite il launcher. Se quella cartella non esiste,
+chiede quale cartella usare. Non importa né esegue moduli del gestionale.
+
+Prepara `SORGENTI_PANORAMICA.zip` in una propria cartella temporanea e apre
+Esplora file con lo ZIP selezionato. L'archivio contiene codice privato, layout,
+stili e un manifesto con percorsi relativi e impronte; l'invio è manuale.
+Database, documenti, log e file di configurazione dati non sono inclusi. Le
+esclusioni e i limiti sono descritti in `docs/INTEGRAZIONE_PANORAMICA.md`.
+I sorgenti originali ricevuti restano fuori dal repository pubblico.
 
 ## Avvio
 
