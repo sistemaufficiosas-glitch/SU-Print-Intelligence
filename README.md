@@ -4,18 +4,11 @@ Motore Python indipendente dal gestionale. Legge esclusivamente uno snapshot SQL
 autonomo e restituisce un report JSON. Nessuna integrazione con Panoramica,
 Contratti, Monitoraggio o Cartella Tecnica è inclusa.
 
-Versione 1.0.3: riconosciuto lo schema reale dal rapporto fornito e aggiunta la
-diagnostica locale dei formati JSON. L'adattatore delle letture reali resta da
-completare: una mappatura dei soli nomi di tabelle e colonne non è sufficiente.
-Vedere `docs/SCHEMA_REALE_V1.md` per le prove disponibili e quelle mancanti.
+Versione 1.1.0: adattatore del registro reale Remote Agent, ricavato dallo schema,
+dalla diagnostica e dai sorgenti di ricezione forniti per la revisione. Il risultato
+resta `REVIEW_REQUIRED` fino al confronto delle letture con casi noti. Vedere
+`docs/REGOLE_ADATTATORE.md` per filtri, cronologia, esclusioni e limiti del totale.
 
-Versione 1.0.2: aggiunto lo strumento guidato `crea_copia_collaudo_windows.bat`
-per preparare uno snapshot autonomo e il rapporto della struttura del database.
-
-Versione 1.0.1: chiusura esplicita delle connessioni dei database temporanei nei
-test, per consentire la pulizia su Windows. Un test di regressione mantiene gli
-handle referenziati e ne verifica la chiusura prima di eliminare i file, anche
-quando una query del motore fallisce.
 Il file `test_windows.bat` si può aprire con doppio clic: la finestra resta aperta
 per mostrare il risultato fino alla pressione di un tasto.
 
@@ -27,22 +20,49 @@ Da una cartella estratta del pacchetto:
 
 ```bat
 test_windows.bat
-avvia_windows.bat "C:\Collaudo\copia.sqlite" --output "C:\Collaudo\report-nuovo.json"
-avvia_windows.bat "C:\Collaudo\copia.sqlite" --mapping examples\mapping.json
+collaudo_reale_windows.bat
+avvia_windows.bat "C:\Collaudo\snapshot.sqlite" --schema su-print --output "C:\Collaudo\report-nuovo.json"
 ```
 
 Su Linux/macOS, dalla radice del progetto:
 
 ```sh
 PYTHONPATH=src python3 -m unittest discover -s tests -v
-PYTHONPATH=src python3 -m su_print_counters /percorso/copia.sqlite --output /percorso/report-nuovo.json
+PYTHONPATH=src python3 -m su_print_counters /percorso/snapshot.sqlite --schema su-print --output /percorso/report-nuovo.json
 ```
 
 Installazione opzionale come pacchetto: `python -m pip install .`; poi usare
-`su-print-counters copia.sqlite --output report.json`.
+`su-print-counters snapshot.sqlite --schema su-print --output report.json`.
 Senza `--output`, il JSON viene scritto sullo standard output. Un errore operativo
 restituisce codice 1; le anomalie dei dati sono nel report e non sono errori di avvio.
 I file di destinazione esistenti non vengono sovrascritti.
+
+## Collaudo locale delle letture reali
+
+Aprire `collaudo_reale_windows.bat` con doppio clic e scegliere lo
+`snapshot.sqlite` già preparato sul Desktop. Il controllo legge il registro delle
+telemetrie e crea una nuova cartella `Risultati_Contatori_V1_*` accanto alla copia:
+
+| File | Uso |
+| --- | --- |
+| `risultati_contatori.html` | Tabella locale con matricole e ultima telemetria valida ricevuta, da aprire con doppio clic |
+| `risultati_contatori.json` | Storico completo controllato, macchine escluse, ultime letture per contatore e anomalie; contiene dati da conservare sul PC |
+| `esito_collaudo.json` | Solo conteggi, codici, controlli booleani e impronta della copia, da condividere per proseguire il collaudo |
+| `LEGGIMI.txt` | Istruzioni e limiti del controllo |
+
+L'HTML è un file statico locale, senza risorse di rete o codice proveniente dal
+database. Non sostituisce il confronto con il contatore della macchina. I contatori
+assenti restano assenti, non diventano zero e non sono riportati avanti nella
+tabella. Il totale è etichettato come **dichiarato**: il vecchio sistema poteva
+derivarlo dai marker e non ne salvava l'origine. Le date di raccolta senza fuso
+restano senza fuso. La cronologia usa la ricezione server UTC, previa verifica
+dello schema per i valori senza offset. Lo storico di vecchie associazioni resta
+distinto dall'ultima lettura attualmente utilizzabile.
+
+Il motore applica un limite di tre minuti e consente l'annullamento; la successiva
+serializzazione dei risultati può richiedere altro tempo. In caso di errore o
+annullamento elimina solo la propria cartella incompleta. Nessuna scrittura sul
+database, importazione dei servizi originali o integrazione nel gestionale.
 
 ## Preparare la copia sul PC Windows
 
@@ -106,12 +126,13 @@ specifico, se necessario. `diagnose_snapshot` e il motore non richiedono che il
 programma attivo sia installato. Il rapporto comprende questi nomi di moduli:
 controllarlo prima di condividerlo.
 
-## Contratto dello snapshot e mappatura
+## Contratto di riferimento e mappatura semplice
 
-Il database reale non è presente nel repository: lo schema seguente è il contratto
-di riferimento V1, non una descrizione verificata del gestionale esistente.
-`examples/mapping.json` permette di mappare tabelle e colonne reali senza SQL libero.
-Non viene dedotto uno schema ambiguo e non viene eseguita alcuna migrazione.
+Il database reale non è presente nel repository. Lo schema seguente è il contratto
+sintetico usato nei primi test; rimane disponibile tramite `--schema reference`
+(predefinito) e `examples/mapping.json`. La mappatura dei soli nomi non è adatta al
+registro reale, che richiede invece `--schema su-print` e il parsing dei payload.
+Non viene eseguita alcuna migrazione.
 
 | Tabella | Colonne richieste | Significato |
 | --- | --- | --- |
@@ -139,7 +160,7 @@ file `-wal`, `-shm` o `-journal` adiacenti e apre la sorgente con
 durante l'analisi: il programma non può certificare da solo che sia una copia
 né rilevare tutti i casi di copia incompleta. Non passare il database attivo.
 
-## Regole e risultati
+## Regole del contratto di riferimento
 
 - Una macchina entra nel risultato solo se ha matricola univoca, Agent associato
   con matricola coerente e almeno una lettura valida.
@@ -159,7 +180,9 @@ né rilevare tutti i casi di copia incompleta. Non passare il database attivo.
 incluse/escluse e letture accettate/scartate. Le telemetrie scartate restano nel
 database sorgente e vengono segnalate nel report. Non esiste archivio persistente
 aggiuntivo: ogni report ricostruisce lo storico disponibile nello snapshot fornito.
-L'analisi carica lo snapshot in memoria; la capacità su volumi reali va collaudata.
+Il contratto di riferimento carica le righe in memoria. L'adattatore reale scorre
+i payload del log e conserva solo le letture normalizzate e le anomalie; lo storico
+ricostruito e la sua serializzazione richiedono memoria proporzionale alle righe.
 
 ## Collaudo prima delle integrazioni
 
@@ -170,11 +193,11 @@ del database e dell'elenco dei file. Non usa né modifica il database operativo.
 Prima di qualsiasi integrazione:
 
 1. Eseguire `test_windows.bat` sulla macchina Windows destinata al servizio.
-2. Ricevere schema reale e snapshot anonimizzato/controllato, adattare la mappatura
-   e verificare che gli Agent siano fonti attendibili e il flag abbia il significato previsto.
+2. Eseguire `collaudo_reale_windows.bat` sulla copia controllata e verificare i
+   risultati e le anomalie. Controllare che l'impronta corrisponda alla copia scelta.
 3. Confrontare matricole, storico, ultima lettura ed esclusioni con casi noti,
    inclusi reset e conflitti; verificare hash del database prima e dopo.
 4. Misurare tempi e memoria sui volumi reali e conservare il report di collaudo.
 5. Autorizzare separatamente le integrazioni solo dopo esito positivo del collaudo.
 
-I test sintetici non certificano la compatibilità con lo schema reale o Windows.
+I test sintetici non certificano da soli le letture effettive o la GUI Windows.

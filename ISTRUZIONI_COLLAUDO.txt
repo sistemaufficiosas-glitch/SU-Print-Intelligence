@@ -1,0 +1,17 @@
+CENTRO RACCOLTA CONTATORI V1 - COLLAUDO DELLA COPIA REALE
+
+1. Estrai tutto lo ZIP in una nuova cartella.
+2. Apri con doppio clic collaudo_reale_windows.bat.
+3. Seleziona lo snapshot.sqlite gia' creato sul Desktop e premi Apri.
+4. Attendi il messaggio Rapporti pronti, quindi premi OK.
+5. Nella cartella che si apre:
+   - apri risultati_contatori.html con doppio clic per vedere la tabella;
+   - allega in chat SOLO esito_collaudo.json;
+   - conserva risultati_contatori.json sul PC (contiene i dati completi).
+
+Lo stato e' COLLAUDO DA VERIFICARE: confrontiamo i dati con casi noti prima
+delle integrazioni. Il totale e' dichiarato dal vecchio sistema e richiede
+verifica; l'ora di ricezione UTC e quella di raccolta sono distinte.
+
+Il motore legge soltanto la copia, non modifica il gestionale o il database.
+Non e' necessario creare un'altra copia per questo passaggio.

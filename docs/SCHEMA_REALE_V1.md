@@ -19,31 +19,39 @@ Non identificare macchine tramite IP, MAC, nome, UUID Agent o certificato.
 Discordanze di matricola devono restare segnalate e non causare fusioni automatiche.
 `snmp_readonly` è un nome di permesso, non una prova di lettura riuscita.
 
-## Prove mancanti
+## Evidenza dai sorgenti esaminati
 
-1. Percorsi nel JSON per matricola dichiarata, risultato della lettura, contatori
-   e timestamp; eventuali formati storici diversi e gestione dei messaggi annidati.
-2. Significato effettivo di `accepted`: la struttura non dimostra che `1` attesti
-   validità del contatore, anziché sola accettazione del messaggio autenticato.
-3. Valori di `status` e `source`; significato di iscrizione, revoca ed esclusioni
-   all'istante della lettura, distinto dallo stato attuale.
-4. Formati e fusi dei timestamp. `TEXT` non specifica se la data sia UTC, locale
-   o senza fuso; la posizione del PC non prova il fuso usato dall'applicazione.
-5. Relazione e deduplicazione fra log remoto e storico contatori, da confermare
-   senza associare arbitrariamente due righe solo perché hanno gli stessi valori.
+Sono stati forniti `remote_agent_ingest.py`, `remote_agent_pilot.py` e
+`meter_readings_service.py`. Sono conservati fuori dal repository e non inclusi
+nei pacchetti. Dalla lettura statica risultano:
 
-La diagnostica sulla copia riporta solo struttura e conteggi di campioni recenti;
-non esporta i valori dei payload. Aiuta a localizzare i campi, ma la prova più
-autorevole rimane il codice che produce i messaggi e quello che li riceve/salva.
-Se il formato o il significato restano ambigui, chiedere i moduli sorgente specifici.
+1. Il payload salvato ha campi top-level `printer_id`, `serial_number`, `snmp_ok`,
+   `collected_at`, `total_counter_candidate`, `black_counter`, `color_counter`.
+2. `accepted=1` viene scritto dopo autenticazione e controllo del binding, anche
+   con SNMP fallito, matricola vuota o contatori assenti. Non equivale a lettura corretta.
+3. Lo stato Agent verificato è `Attivo` (confronto senza distinzione di maiuscole);
+   la fonte dello storico contatori è `Remote Agent`, con spazio. Il log precede
+   il tentativo di scrivere lo storico, in una transazione separata.
+4. Il codice non valorizza `received_at` negli INSERT e il CREATE della tabella
+   usa `CURRENT_TIMESTAMP`. Il default effettivo viene ricontrollato sulla copia:
+   la dichiarazione `IF NOT EXISTS` da sola non prova lo schema già installato.
+5. `collected_at` può essere locale senza fuso; il V1 non lo presume UTC o Roma.
+6. Il Pilot può derivare il candidato totale dal massimo dei marker, senza salvare
+   un indicatore dell'origine. Non è possibile certificarla dal payload normalizzato.
+7. Il vecchio discovery può ricercare/riassociare per indirizzo e aggiornare la
+   matricola; questi comportamenti non vengono riprodotti dal V1.
+
+La diagnostica recente non copre automaticamente ogni formato storico. Il V1
+accetta solo il contratto verificato, segnala righe non conformi e conserva le
+distinzioni fra controllo dei dati e attestazione del registro centrale.
 
 ## Stato corrente
 
-Il motore del contratto sintetico V1 è collaudato. Lo schema reale è riconosciuto
-e la diagnostica è testata su database sintetici conformi alle colonne osservate.
-La lettura di contatori reali non è ancora certificata: nessun fallback per IP,
-nessuna matricola sostitutiva e nessuna interpretazione automatica di campi JSON
-vengono introdotti per far apparire valido un risultato.
+L'adattatore reale è implementato e testato su database sintetici conformi alle
+colonne e al codice osservati, con una procedura guidata di collaudo locale.
+Il database completo non è stato caricato in questo ambiente. La certificazione
+delle letture reali richiede eseguire il controllo sullo snapshot del PC e confrontare
+risultati/anomalie con casi noti. Limiti e regole sono in `REGOLE_ADATTATORE.md`.
 
 Le integrazioni con Panoramica, Contratti, Monitoraggio e Cartella Tecnica rimangono
 successive al collaudo delle letture reali e alla revisione dei casi anomali.
