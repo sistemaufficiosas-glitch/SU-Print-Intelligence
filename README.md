@@ -4,6 +4,11 @@ Motore Python indipendente dal gestionale. Legge esclusivamente uno snapshot SQL
 autonomo e restituisce un report JSON. Nessuna integrazione con Panoramica,
 Contratti, Monitoraggio o Cartella Tecnica è inclusa.
 
+Versione 1.0.3: riconosciuto lo schema reale dal rapporto fornito e aggiunta la
+diagnostica locale dei formati JSON. L'adattatore delle letture reali resta da
+completare: una mappatura dei soli nomi di tabelle e colonne non è sufficiente.
+Vedere `docs/SCHEMA_REALE_V1.md` per le prove disponibili e quelle mancanti.
+
 Versione 1.0.2: aggiunto lo strumento guidato `crea_copia_collaudo_windows.bat`
 per preparare uno snapshot autonomo e il rapporto della struttura del database.
 
@@ -67,6 +72,39 @@ La GUI richiede Tkinter, incluso nell'installazione completa di Python per Windo
 Il rapporto serve per stabilire lo schema reale: non dimostra ancora che la
 sorgente selezionata sia quella effettivamente utilizzata dall'applicazione o che
 le telemetrie soddisfino il contratto V1.
+
+## Diagnostica dello snapshot reale
+
+Aprire `diagnostica_copia_windows.bat` con doppio clic e selezionare
+`snapshot.sqlite` nella cartella di collaudo sul Desktop. La lettura usa
+`mode=ro&immutable=1` e `query_only=ON`; rifiuta nomi diversi e sidecar WAL/SHM/journal.
+Il nome e l'assenza di sidecar non possono da soli provare che un file sia una
+copia: usare esclusivamente lo snapshot chiuso creato nel passaggio precedente.
+
+La diagnostica produce un nuovo file `diagnostica_collaudo_*.json` accanto alla
+copia. Registra il suo SHA-256, conteggi, relazioni mancanti, tipi e percorsi JSON
+di un campione delle 40 righe più recenti per gruppo (accettate, rifiutate, flag
+diversi e storico contatori). Registra le forme temporali senza scegliere un fuso.
+Non include record, payload, matricole, IP, clienti, certificati, chiavi o valori
+liberi. I nomi JSON non appartenenti a un vocabolario fisso diventano `<other>`;
+anche i nomi dinamici possono infatti contenere dati. Stati e fonti riconosciuti
+sono categorie predefinite, gli altri diventano `other`.
+
+I limiti di dimensione/profondità dei JSON e copertura dei campioni sono dichiarati
+nel rapporto; JSON con chiavi duplicate o numeri non standard sono contati come
+invalidi. Il risultato è `SEMANTICS_UNCONFIRMED` oppure `SCHEMA_INCOMPLETE`, mai
+una certificazione delle letture. Dopo due minuti il lavoro si interrompe; è
+possibile annullarlo dalla finestra. Il rapporto non dimostra che i formati meno
+recenti siano coperti e non sostituisce la verifica del produttore/gestore dei messaggi.
+
+La sola interfaccia guidata aggiunge un indice opzionale dei moduli Python nella
+cartella `app` del percorso d'installazione individuato. Legge i file senza
+importarli o eseguirli e riporta solo nomi relativi e tre nomi di tabelle cercate,
+mai righe di codice. L'indice ha limiti espliciti (500 file, 5 secondi, 1 MiB per
+file, 20 candidati) e segnala scansioni incomplete. Serve a chiedere il modulo
+specifico, se necessario. `diagnose_snapshot` e il motore non richiedono che il
+programma attivo sia installato. Il rapporto comprende questi nomi di moduli:
+controllarlo prima di condividerlo.
 
 ## Contratto dello snapshot e mappatura
 

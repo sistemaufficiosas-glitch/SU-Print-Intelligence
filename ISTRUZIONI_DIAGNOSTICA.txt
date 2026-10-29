@@ -1,0 +1,14 @@
+SU PRINT - DIAGNOSTICA DELLA COPIA
+
+1. Estrai tutto il contenuto dello ZIP in una nuova cartella.
+2. Apri con doppio clic diagnostica_copia_windows.bat.
+3. Seleziona snapshot.sqlite nella cartella SU_Print_Collaudo sul Desktop.
+4. Attendi il messaggio Rapporto pronto e premi OK.
+5. Dalla cartella che si apre allega in chat il file diagnostica_collaudo_*.json.
+
+Il rapporto contiene conteggi e struttura dei messaggi, senza record o valori
+liberi. Non allegare snapshot.sqlite: conserva la copia completa sul PC.
+Se disponibili, comprende anche i soli nomi dei moduli Python che gestiscono
+le telemetrie, senza copiarne il codice: ci aiuta a chiedere il file preciso.
+La copia viene aperta in sola lettura. Il controllo non modifica il gestionale
+e non certifica ancora la validità delle letture reali.
