@@ -41,7 +41,7 @@ def _invalid_constant(value):
     raise ValueError("Costante JSON non standard")
 
 
-def find_latest_snapshot(desktop):
+def find_latest_snapshot(desktop, *, additional_locations=()):
     """Seleziona solo l'ultima cartella prodotta dal nostro helper.
 
     La data nel nome della cartella identifica la creazione, mentre la data di
@@ -49,32 +49,50 @@ def find_latest_snapshot(desktop):
     Se l'ultima copia è incompleta o dubbia non si ripiega su copie precedenti.
     Il contenuto SQLite sarà poi verificato dall'adattatore in sola lettura.
     """
-    try:
-        desktop = Path(desktop).resolve(strict=True)
-    except FileNotFoundError as error:
-        raise FileNotFoundError("La cartella Desktop non è disponibile.") from error
-    if not desktop.is_dir():
-        raise ValueError("La cartella Desktop non è disponibile.")
-    candidates = []
-    for child in desktop.iterdir():
-        match = _FOLDER.fullmatch(child.name)
-        if match is None:
-            continue
+    roots = []
+    seen = set()
+    non_directories = []
+    locations = (desktop, *additional_locations)
+    for location in locations:
         try:
-            timestamp = datetime.strptime(match.group(1), "%Y%m%d_%H%M%S")
-        except ValueError:
-            continue  # Un nome impossibile non è stato generato dall'helper.
-        candidates.append((timestamp, child))
+            root = Path(location).resolve(strict=True)
+        except FileNotFoundError:
+            continue
+        if not root.is_dir():
+            non_directories.append(root)
+            continue
+        key = os.path.normcase(str(root))
+        if key not in seen:
+            seen.add(key)
+            roots.append(root)
+    if not roots:
+        if non_directories:
+            raise ValueError("La cartella Desktop non è disponibile.")
+        raise FileNotFoundError("La cartella Desktop non è disponibile.")
+    candidates = []
+    for root in roots:
+        for child in root.iterdir():
+            match = _FOLDER.fullmatch(child.name)
+            if match is None:
+                continue
+            try:
+                timestamp = datetime.strptime(match.group(1), "%Y%m%d_%H%M%S")
+            except ValueError:
+                continue  # Un nome impossibile non è stato generato dall'helper.
+            candidates.append((timestamp, child, root))
     if not candidates:
-        raise FileNotFoundError("Non trovo una copia di collaudo sul Desktop.")
-    newest_time = max(timestamp for timestamp, _ in candidates)
-    newest = [path for timestamp, path in candidates if timestamp == newest_time]
+        searched = "\n".join(str(root) for root in roots[:6])
+        raise FileNotFoundError(
+            "Non trovo una copia di collaudo nelle cartelle controllate:\n" + searched
+        )
+    newest_time = max(timestamp for timestamp, _, _ in candidates)
+    newest = [(path, root) for timestamp, path, root in candidates if timestamp == newest_time]
     if len(newest) != 1:
         raise ValueError("Ci sono più copie create nello stesso istante: non posso scegliere con certezza.")
-    folder = newest[0]
+    folder, selected_root = newest[0]
     _plain_entry(folder, directory=True)
-    if folder.resolve(strict=True).parent != desktop:
-        raise ValueError("La copia più recente non si trova direttamente sul Desktop.")
+    if folder.resolve(strict=True).parent != selected_root:
+        raise ValueError("La copia più recente non si trova direttamente nella cartella controllata.")
     snapshot = folder / "snapshot.sqlite"
     schema = folder / "schema_collaudo.json"
     _plain_entry(snapshot)

@@ -7,6 +7,7 @@ import queue
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 from collections import Counter
@@ -320,7 +321,10 @@ def main(*, automatic=False):
         from .simple_selection import find_latest_snapshot
 
         try:
-            selected = find_latest_snapshot(desktop_directory())
+            selected = find_latest_snapshot(
+                desktop_directory(),
+                additional_locations=(Path(sys.argv[0]).resolve().parent, Path.home() / "Desktop"),
+            )
         except (OSError, ValueError) as error:
             messagebox.showerror("Copia non trovata", f"{error}\n\nMandami una foto di questa finestra per continuare.", parent=root)
             root.destroy()

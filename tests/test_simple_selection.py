@@ -18,8 +18,8 @@ class SimpleSelectionTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.desktop = Path(self.tmp.name)
 
-    def copy(self, stamp="20261029_192453", suffix="abcdefgh"):
-        folder = self.desktop / f"SU_Print_Collaudo_{stamp}_{suffix}"
+    def copy(self, stamp="20261029_192453", suffix="abcdefgh", *, root=None):
+        folder = (self.desktop if root is None else root) / f"SU_Print_Collaudo_{stamp}_{suffix}"
         folder.mkdir()
         (folder / "snapshot.sqlite").write_bytes(b"SQLite format 3\x00" + b"synthetic fixture")
         (folder / "schema_collaudo.json").write_text(json.dumps(
@@ -177,6 +177,79 @@ class SimpleSelectionTests(unittest.TestCase):
         (self.desktop / "SU_Print_Collaudo_20261029_192453_abcdefgh").write_bytes(b"not a folder")
         with self.assertRaisesRegex(ValueError, "tipo previsto"):
             find_latest_snapshot(self.desktop)
+
+    def test_empty_shell_desktop_finds_copy_next_to_launcher(self):
+        actual_desktop = self.desktop / "physical desktop"
+        actual_desktop.mkdir()
+        copy = self.copy(root=actual_desktop)
+        launcher = actual_desktop / "launcher.bat"
+        launcher.write_bytes(b"synthetic launcher")
+        self.assertEqual(
+            find_latest_snapshot(self.desktop, additional_locations=(launcher.parent,)),
+            copy / "snapshot.sqlite",
+        )
+
+    def test_newest_is_chosen_globally_not_first_successful_location(self):
+        physical = self.desktop / "physical desktop"
+        physical.mkdir()
+        self.copy("20261029_131713")
+        newest = self.copy(root=physical)
+        for first, extra in ((self.desktop, physical), (physical, self.desktop)):
+            with self.subTest(first=first):
+                self.assertEqual(
+                    find_latest_snapshot(first, additional_locations=(extra,)),
+                    newest / "snapshot.sqlite",
+                )
+
+    def test_unsafe_newest_in_other_location_blocks_an_older_safe_copy(self):
+        physical = self.desktop / "physical desktop"
+        physical.mkdir()
+        self.copy("20261029_131713")
+        newest = self.copy(root=physical)
+        (newest / "snapshot.sqlite-wal").write_bytes(b"unsafe sidecar")
+        with self.assertRaisesRegex(ValueError, "aggiuntivi"):
+            find_latest_snapshot(self.desktop, additional_locations=(physical,))
+        (newest / "snapshot.sqlite-wal").unlink()
+        (newest / "schema_collaudo.json").unlink()
+        with self.assertRaises(FileNotFoundError):
+            find_latest_snapshot(self.desktop, additional_locations=(physical,))
+
+    def test_equivalent_roots_do_not_make_one_copy_ambiguous(self):
+        copy = self.copy()
+        harmless_child = self.desktop / "existing child"
+        harmless_child.mkdir()
+        self.assertEqual(
+            find_latest_snapshot(self.desktop, additional_locations=(self.desktop, harmless_child / "..")),
+            copy / "snapshot.sqlite",
+        )
+
+    def test_missing_primary_and_optional_roots_allow_an_available_location(self):
+        copy = self.copy()
+        not_directory = self.desktop / "regular file"
+        not_directory.write_text("not a folder", encoding="utf-8")
+        self.assertEqual(
+            find_latest_snapshot(
+                self.desktop / "missing primary",
+                additional_locations=(self.desktop / "missing optional", not_directory, self.desktop),
+            ),
+            copy / "snapshot.sqlite",
+        )
+
+    def test_same_creation_time_in_distinct_locations_remains_ambiguous(self):
+        physical = self.desktop / "physical desktop"
+        physical.mkdir()
+        self.copy()
+        self.copy(root=physical)
+        with self.assertRaisesRegex(ValueError, "stesso istante"):
+            find_latest_snapshot(self.desktop, additional_locations=(physical,))
+
+    def test_not_found_error_reports_locations_checked(self):
+        physical = self.desktop / "physical desktop"
+        physical.mkdir()
+        with self.assertRaises(FileNotFoundError) as caught:
+            find_latest_snapshot(self.desktop, additional_locations=(physical,))
+        self.assertIn(str(self.desktop), str(caught.exception))
+        self.assertIn(str(physical), str(caught.exception))
 
 
 if __name__ == "__main__":

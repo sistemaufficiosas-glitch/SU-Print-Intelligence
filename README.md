@@ -4,8 +4,9 @@ Motore Python indipendente dal gestionale. Legge esclusivamente uno snapshot SQL
 autonomo e restituisce un report JSON. Nessuna integrazione con Panoramica,
 Contratti, Monitoraggio o Cartella Tecnica è inclusa.
 
-Versione 1.1.2: avvio Windows in un solo file, con scelta automatica della copia
-più recente e apertura del file di supporto già selezionato. Mantiene dettagli
+Versione 1.1.3: avvio Windows in un solo file, con ricerca della copia anche
+accanto al launcher quando il Desktop indicato da Windows è diverso. Mantiene scelta
+automatica della copia più recente e apertura del file di supporto già selezionato, dettagli
 delle anomalie, controllo delle letture parziali e archivio compresso.
 
 Adattatore del registro reale Remote Agent, ricavato dallo schema,
@@ -23,12 +24,15 @@ I launcher Windows richiedono Python 3.11 e il launcher `py` installato.
 
 ### Avvio semplice per il collaudo già avviato
 
-Scaricare `AVVIA_COLLAUDO_SEMPLICE.bat` e aprirlo con doppio clic. Il file contiene
+Scaricare `AVVIA_COLLAUDO_CORRETTO.bat` e aprirlo con doppio clic. Il file contiene
 già il pacchetto Python: non occorre estrarre, installare o cercare altri file.
 Durante l'esecuzione non scarica codice o dati dalla rete.
 
-Trova sul Desktop effettivo la cartella `SU_Print_Collaudo_*` più recente, usando
-la data nel nome generato dal nostro strumento di copia. Richiede una copia
+Trova la cartella `SU_Print_Collaudo_*` più recente fra il Desktop indicato da
+Windows, il Desktop del profilo e la cartella contenente il file di avvio, usando
+la data nel nome generato dal nostro strumento di copia. Cerca solo nelle cartelle
+immediate e sceglie fra tutte le posizioni insieme, senza privilegiare una copia
+vecchia nella prima posizione. Richiede una copia
 completata con `schema_collaudo.json` e `snapshot.sqlite`, senza collegamenti o
 sidecar. Se la più recente è incompleta o due copie hanno la stessa data di
 creazione, segnala il problema senza usare di nascosto una copia più vecchia.

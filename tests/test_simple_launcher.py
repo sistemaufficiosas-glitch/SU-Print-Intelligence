@@ -77,6 +77,7 @@ def fake_main(*, automatic=False):
     print(json.dumps({
         'automatic': automatic,
         'isolated': sys.flags.isolated,
+        'entry_file': sys.argv[0],
         'origins': [module.__file__ for module in modules],
     }))
     return 0
@@ -91,6 +92,7 @@ runpy.run_path(archive, run_name='__main__')
         output = json.loads(result.stdout)
         self.assertTrue(output["automatic"])
         self.assertEqual(output["isolated"], 1)
+        self.assertEqual(output["entry_file"], str(launcher))
         self.assertEqual(len(output["origins"]), 4)
         for origin in output["origins"]:
             self.assertTrue(origin.startswith(str(launcher)), origin)
@@ -154,7 +156,10 @@ runpy.run_path(archive, run_name='__main__')
         ):
             self.assertEqual(acceptance.main(automatic=True), 0)
         picker.assert_not_called()
-        choose.assert_called_once_with(self.folder)
+        choose.assert_called_once_with(
+            self.folder,
+            additional_locations=(Path(sys.argv[0]).resolve().parent, Path.home() / "Desktop"),
+        )
         self.assertEqual(collect.call_args.args, (selected,))
         completed.assert_called_once_with(root, result_folder, simple=True)
 
