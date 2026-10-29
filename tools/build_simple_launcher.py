@@ -45,6 +45,6 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("output", nargs="?", default="AVVIA_COLLAUDO_CORRETTO.bat")
+    parser.add_argument("output", nargs="?", default="AVVIA_CONTATORI.bat")
     args = parser.parse_args()
     print(build(args.output))

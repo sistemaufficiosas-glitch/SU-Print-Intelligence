@@ -1,8 +1,8 @@
-# Verifiche della versione 1.1.3
+# Verifiche della versione 1.1.4
 
 ## Test automatici
 
-La suite completa contiene 128 test eseguiti con successo nell'ambiente Linux.
+La suite completa contiene 149 test eseguiti con successo nell'ambiente Linux.
 Include il contratto di riferimento, backup WAL, diagnostica, indice dei sorgenti,
 adattatore reale, CLI e generazione dei rapporti. I controlli SQLite conservano
 riferimenti alle connessioni per rilevare handle lasciati aperti anche su Linux;
@@ -38,6 +38,15 @@ recente, duplicazione dello stesso percorso, cartelle non disponibili, conflitti
 e copie recenti incomplete che devono bloccare il processo. Il test del file
 incorporato controlla anche il percorso del launcher passato a `sys.argv[0]`.
 
+La 1.1.4 aggiunge 18 casi di ricerca diretta dei file in cartelle rinominate o
+annidate, indipendentemente dal formato del nome. Verifica ordine per rapporto
+di completamento, copie incomplete recenti, schemi malformati, radici sovrapposte,
+collegamenti e limiti di scansione. La profondità definisce l'ambito cercato;
+superare i limiti di tempo o numero di voci impedisce l'uso di risultati parziali.
+Tre ulteriori casi GUI coprono il selettore quando nessun file è trovato,
+l'annullamento e la validazione effettiva della scelta. La pipeline completa
+sintetica usa una cartella rinominata e controlla ancora ZIP e database invariato.
+
 ## Prova rappresentativa di capacità
 
 Con la versione 1.1.0 è stata eseguita la pipeline SQLite → adattatore → quattro file su
@@ -62,13 +71,14 @@ macchina è compatibile con la progressione dei contatori, ma non è una misuraz
 contemporanea e non spiega le anomalie storiche. Il confronto fisico resta
 distinto dai test delle regole; il database completo non è stato caricato qui.
 
-L'avvio unico 1.1.2 ha avviato Python e mostrato la GUI sul PC Windows, ma ha
-segnalato l'assenza di copie nella posizione controllata. Il nome della cartella
-visibile nelle schermate è compatibile con il riconoscimento: una posizione
-Desktop diversa resta un'ipotesi, non una causa accertata. La versione 1.1.3 cerca
-anche accanto al launcher e nel Desktop del profilo senza percorsi utente
-codificati nel programma; deve ancora essere eseguita sul PC. Il completamento
-del flusso automatico e l'apertura effettiva di Explorer restano da verificare.
-I test GUI verificano il flusso con componenti simulati.
+Gli avvii unici 1.1.2 e 1.1.3 hanno avviato Python e mostrato la GUI sul PC
+Windows, ma hanno segnalato l'assenza di copie riconosciute. La schermata 1.1.3
+conferma che il Desktop controllato corrisponde al percorso mostrato in Esplora
+file. Il nome della cartella visibile è compatibile con il filtro precedente;
+la causa esatta dello zero candidati resta da accertare. La 1.1.4 sostituisce
+quel filtro con la ricerca dei file, senza interpretare date nel nome delle
+cartelle. Deve ancora essere eseguita sul PC. Il completamento del flusso
+automatico e l'apertura effettiva di Explorer restano da verificare. I test GUI
+verificano il flusso con componenti simulati.
 
 Nessuna integrazione o modifica del database operativo è stata eseguita.

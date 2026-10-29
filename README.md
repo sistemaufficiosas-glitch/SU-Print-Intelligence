@@ -4,10 +4,10 @@ Motore Python indipendente dal gestionale. Legge esclusivamente uno snapshot SQL
 autonomo e restituisce un report JSON. Nessuna integrazione con Panoramica,
 Contratti, Monitoraggio o Cartella Tecnica è inclusa.
 
-Versione 1.1.3: avvio Windows in un solo file, con ricerca della copia anche
-accanto al launcher quando il Desktop indicato da Windows è diverso. Mantiene scelta
-automatica della copia più recente e apertura del file di supporto già selezionato, dettagli
-delle anomalie, controllo delle letture parziali e archivio compresso.
+Versione 1.1.4: avvio Windows in un solo file, con ricerca diretta dei file della
+copia anche nelle sottocartelle, indipendentemente dal nome della cartella.
+Mantiene scelta automatica, apertura del file di supporto già selezionato,
+dettagli delle anomalie, controllo delle letture parziali e archivio compresso.
 
 Adattatore del registro reale Remote Agent, ricavato dallo schema,
 dalla diagnostica e dai sorgenti di ricezione forniti per la revisione. Il risultato
@@ -24,19 +24,25 @@ I launcher Windows richiedono Python 3.11 e il launcher `py` installato.
 
 ### Avvio semplice per il collaudo già avviato
 
-Scaricare `AVVIA_COLLAUDO_CORRETTO.bat` e aprirlo con doppio clic. Il file contiene
+Scaricare `AVVIA_CONTATORI.bat` e aprirlo con doppio clic. Il file contiene
 già il pacchetto Python: non occorre estrarre, installare o cercare altri file.
 Durante l'esecuzione non scarica codice o dati dalla rete.
 
-Trova la cartella `SU_Print_Collaudo_*` più recente fra il Desktop indicato da
-Windows, il Desktop del profilo e la cartella contenente il file di avvio, usando
-la data nel nome generato dal nostro strumento di copia. Cerca solo nelle cartelle
-immediate e sceglie fra tutte le posizioni insieme, senza privilegiare una copia
-vecchia nella prima posizione. Richiede una copia
-completata con `schema_collaudo.json` e `snapshot.sqlite`, senza collegamenti o
-sidecar. Se la più recente è incompleta o due copie hanno la stessa data di
-creazione, segnala il problema senza usare di nascosto una copia più vecchia.
-La verifica completa della copia rimane affidata all'adattatore in sola lettura.
+Trova `snapshot.sqlite` fra il Desktop indicato da Windows, il Desktop del profilo
+e la cartella contenente il file di avvio. Cerca anche nelle sottocartelle fino
+a sei livelli senza seguire collegamenti o junction. Il nome della cartella è
+libero. La scansione è limitata a 4.000 cartelle, 50.000 voci e cinque secondi;
+non usa risultati parziali se supera questi limiti.
+
+Sceglie globalmente la copia con il rapporto `schema_collaudo.json` modificato
+più recentemente: l'helper scrive quel rapporto per ultimo. È un criterio basato
+sui metadati, non una prova della creazione; modificare il rapporto può alterare
+l'ordine. Uno snapshot senza rapporto usa la propria data di modifica e una
+candidata incompleta o non sicura blocca la selezione, senza ripiegare su copie
+vecchie. I timestamp identici restano ambigui. Richiede entrambi i file, nessun
+collegamento o sidecar, e la verifica in sola lettura dell'adattatore. Se la
+ricerca completa non trova alcuna candidata, apre la finestra per selezionare
+`snapshot.sqlite`; la copia scelta viene comunque verificata.
 
 Prepara i rapporti accanto alla copia e apre Esplora file con
 `supporto_collaudo.zip` selezionato. La finestra resta aperta con il pulsante

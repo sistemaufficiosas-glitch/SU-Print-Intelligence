@@ -318,13 +318,22 @@ def main(*, automatic=False):
     root = tk.Tk()
     root.withdraw()
     if automatic:
-        from .simple_selection import find_latest_snapshot
+        from .file_discovery import SnapshotNotFound, discover_snapshot
+        from .simple_selection import validate_snapshot_file
 
         try:
-            selected = find_latest_snapshot(
-                desktop_directory(),
-                additional_locations=(Path(sys.argv[0]).resolve().parent, Path.home() / "Desktop"),
-            )
+            try:
+                selected = discover_snapshot((
+                    desktop_directory(), Path(sys.argv[0]).resolve().parent, Path.home() / "Desktop",
+                ))
+            except SnapshotNotFound:
+                selected = filedialog.askopenfilename(
+                    parent=root, title="Apri la copia snapshot.sqlite",
+                    initialdir=str(desktop_directory()), initialfile="snapshot.sqlite",
+                    filetypes=[("Copia di collaudo", "snapshot.sqlite")],
+                )
+                if selected:
+                    selected = validate_snapshot_file(selected)
         except (OSError, ValueError) as error:
             messagebox.showerror("Copia non trovata", f"{error}\n\nMandami una foto di questa finestra per continuare.", parent=root)
             root.destroy()
@@ -346,10 +355,7 @@ def main(*, automatic=False):
     progress_label = ttk.Label(pending, text="Controllo delle telemetrie sulla copia locale.\nAttendere…")
     progress_label.pack()
     if automatic:
-        from datetime import datetime
-
-        created = datetime.strptime(Path(selected).parent.name[len("SU_Print_Collaudo_"):len("SU_Print_Collaudo_") + 15], "%Y%m%d_%H%M%S")
-        ttk.Label(pending, text=f"Uso la copia del {created:%d/%m/%Y alle %H:%M}.").pack(pady=8)
+        ttk.Label(pending, text=f"Copia nella cartella:\n{Path(selected).parent}", wraplength=480).pack(pady=8)
     bar = ttk.Progressbar(pending, mode="indeterminate", length=420)
     bar.pack(padx=20, pady=10)
     bar.start()

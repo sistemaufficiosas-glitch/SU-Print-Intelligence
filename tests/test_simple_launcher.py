@@ -71,8 +71,8 @@ class SimpleLauncherTests(unittest.TestCase):
 import json, runpy, sys
 archive = sys.argv[1]
 sys.path.insert(0, archive)
-from su_print_counters import acceptance, real_adapter, simple_selection, snapshot
-modules = [acceptance, real_adapter, simple_selection, snapshot]
+from su_print_counters import acceptance, real_adapter, simple_selection, snapshot, file_discovery
+modules = [acceptance, real_adapter, simple_selection, snapshot, file_discovery]
 def fake_main(*, automatic=False):
     print(json.dumps({
         'automatic': automatic,
@@ -93,7 +93,7 @@ runpy.run_path(archive, run_name='__main__')
         self.assertTrue(output["automatic"])
         self.assertEqual(output["isolated"], 1)
         self.assertEqual(output["entry_file"], str(launcher))
-        self.assertEqual(len(output["origins"]), 4)
+        self.assertEqual(len(output["origins"]), 5)
         for origin in output["origins"]:
             self.assertTrue(origin.startswith(str(launcher)), origin)
             self.assertNotIn(str(ROOT / "src"), origin)
@@ -123,9 +123,11 @@ runpy.run_path(archive, run_name='__main__')
             acceptance.show_support_archive(root, self.folder)
         error.assert_called_once_with("File non aperto", "Explorer unavailable", parent=root)
 
-    def test_automatic_mode_runs_selected_copy_without_file_dialog(self):
-        selected = self.folder / "SU_Print_Collaudo_20261029_192453_test1234" / "snapshot.sqlite"
-        result_folder = selected.parent / "Risultati_Contatori_V1_test"
+    def _run_automatic_flow(self, *, selected=None, discovery_error=None, picked=""):
+        from su_print_counters.simple_selection import validate_snapshot_file
+
+        selected = selected or self.folder / "Copia rinominata" / "snapshot.sqlite"
+        result_folder = Path(selected).parent / "Risultati_Contatori_V1_test"
         root = Mock()
         pending_callbacks = []
         root.after.side_effect = lambda delay, callback: pending_callbacks.append(callback)
@@ -147,46 +149,106 @@ runpy.run_path(archive, run_name='__main__')
             patch("tkinter.Tk", return_value=root),
             patch("tkinter.ttk.Frame"), patch("tkinter.ttk.Label"),
             patch("tkinter.ttk.Button"), patch("tkinter.ttk.Progressbar"),
-            patch("tkinter.filedialog.askopenfilename") as picker,
+            patch("tkinter.filedialog.askopenfilename", return_value=picked) as picker,
+            patch("tkinter.messagebox.showerror") as error,
             patch.object(acceptance, "desktop_directory", return_value=self.folder),
-            patch("su_print_counters.simple_selection.find_latest_snapshot", return_value=selected) as choose,
+            patch("su_print_counters.file_discovery.discover_snapshot",
+                  return_value=selected, side_effect=discovery_error) as choose,
+            patch("su_print_counters.simple_selection.validate_snapshot_file", wraps=validate_snapshot_file) as validate,
             patch.object(acceptance, "write_acceptance_report", return_value=result_folder) as collect,
             patch.object(acceptance.threading, "Thread", side_effect=inline_thread),
             patch.object(acceptance, "show_completed_report") as completed,
         ):
-            self.assertEqual(acceptance.main(automatic=True), 0)
-        picker.assert_not_called()
-        choose.assert_called_once_with(
-            self.folder,
-            additional_locations=(Path(sys.argv[0]).resolve().parent, Path.home() / "Desktop"),
-        )
-        self.assertEqual(collect.call_args.args, (selected,))
-        completed.assert_called_once_with(root, result_folder, simple=True)
+            result = acceptance.main(automatic=True)
+        return result, SimpleNamespace(root=root, picker=picker, choose=choose, validate=validate,
+                                       collect=collect, completed=completed, error=error,
+                                       result_folder=result_folder)
+
+    def test_automatic_mode_runs_renamed_copy_without_file_dialog_or_timestamp_parse(self):
+        selected = self.folder / "Copia rinominata" / "snapshot.sqlite"
+        result, ui = self._run_automatic_flow(selected=selected)
+        self.assertEqual(result, 0)
+        ui.picker.assert_not_called()
+        ui.validate.assert_not_called()
+        ui.choose.assert_called_once_with((
+            self.folder, Path(sys.argv[0]).resolve().parent, Path.home() / "Desktop",
+        ))
+        self.assertEqual(ui.collect.call_args.args, (selected,))
+        ui.completed.assert_called_once_with(ui.root, ui.result_folder, simple=True)
+        ui.error.assert_not_called()
 
     def test_automatic_selection_error_does_not_fall_back_to_file_dialog(self):
-        root = Mock()
-        with (
-            patch("tkinter.Tk", return_value=root),
-            patch("tkinter.filedialog.askopenfilename") as picker,
-            patch("tkinter.messagebox.showerror") as error,
-            patch.object(acceptance, "desktop_directory", return_value=self.folder),
-            patch("su_print_counters.simple_selection.find_latest_snapshot", side_effect=ValueError("Copia incompleta")),
-        ):
-            self.assertEqual(acceptance.main(automatic=True), 1)
-        picker.assert_not_called()
-        root.destroy.assert_called_once()
-        error.assert_called_once()
+        for error in (ValueError("Copia incompleta"), OSError("Scansione incompleta")):
+            with self.subTest(error=error):
+                result, ui = self._run_automatic_flow(discovery_error=error)
+                self.assertEqual(result, 1)
+                ui.picker.assert_not_called()
+                ui.validate.assert_not_called()
+                ui.collect.assert_not_called()
+                ui.root.destroy.assert_called_once()
+                ui.error.assert_called_once()
+
+    def test_missing_copy_opens_picker_and_validates_selected_renamed_folder(self):
+        from su_print_counters.file_discovery import SnapshotNotFound
+
+        folder = self.folder / "Scelta manuale senza data"
+        folder.mkdir()
+        selected = folder / "snapshot.sqlite"
+        selected.write_bytes(b"SQLite format 3\x00" + b"synthetic fixture")
+        (folder / "schema_collaudo.json").write_text(json.dumps({
+            "format_version": 1, "source_file": "synthetic.db", "objects": [],
+        }), encoding="utf-8")
+        result, ui = self._run_automatic_flow(
+            selected=selected, discovery_error=SnapshotNotFound("Nessuna copia"), picked=str(selected),
+        )
+        self.assertEqual(result, 0)
+        ui.picker.assert_called_once_with(
+            parent=ui.root, title="Apri la copia snapshot.sqlite", initialdir=str(self.folder),
+            initialfile="snapshot.sqlite", filetypes=[("Copia di collaudo", "snapshot.sqlite")],
+        )
+        ui.validate.assert_called_once_with(str(selected))
+        self.assertEqual(ui.collect.call_args.args, (selected,))
+        ui.completed.assert_called_once_with(ui.root, ui.result_folder, simple=True)
+        ui.error.assert_not_called()
+
+    def test_missing_copy_picker_cancel_does_not_start_collection(self):
+        from su_print_counters.file_discovery import SnapshotNotFound
+
+        result, ui = self._run_automatic_flow(discovery_error=SnapshotNotFound("Nessuna copia"))
+        self.assertEqual(result, 0)
+        ui.picker.assert_called_once()
+        ui.validate.assert_not_called()
+        ui.collect.assert_not_called()
+        ui.completed.assert_not_called()
+        ui.root.destroy.assert_called_once()
+        ui.error.assert_not_called()
+
+    def test_manual_picker_cannot_send_invalid_or_active_database_to_collector(self):
+        from su_print_counters.file_discovery import SnapshotNotFound
+
+        for name in ("su_print_intelligence.db", "snapshot.sqlite"):
+            with self.subTest(name=name):
+                selected = self.folder / name
+                selected.write_bytes(b"invalid database fixture")
+                result, ui = self._run_automatic_flow(
+                    discovery_error=SnapshotNotFound("Nessuna copia"), picked=str(selected),
+                )
+                self.assertEqual(result, 1)
+                ui.validate.assert_called_once_with(str(selected))
+                ui.collect.assert_not_called()
+                ui.completed.assert_not_called()
+                ui.error.assert_called_once()
 
     def test_automatic_selection_to_real_report_preserves_synthetic_snapshot(self):
         import test_real_adapter as fixtures
-        from su_print_counters.simple_selection import find_latest_snapshot
+        from su_print_counters.file_discovery import discover_snapshot
 
         fixture = fixtures.RealAdapterTests(methodName="runTest")
         self.addCleanup(fixture.doCleanups)
         fixture.setUp()
         fixture.reading(1)
         desktop = self.folder / "Desktop"
-        copy_folder = desktop / "SU_Print_Collaudo_20261029_192453_test1234"
+        copy_folder = desktop / "Copia pronta"
         copy_folder.mkdir(parents=True)
         snapshot = copy_folder / "snapshot.sqlite"
         shutil.copyfile(fixture.database, snapshot)
@@ -194,7 +256,7 @@ runpy.run_path(archive, run_name='__main__')
             "format_version": 1, "source_file": "synthetic.db", "objects": [],
         }), encoding="utf-8")
         digest = hashlib.sha256(snapshot.read_bytes()).digest()
-        selected = find_latest_snapshot(desktop)
+        selected = discover_snapshot((desktop,))
         self.assertEqual(selected, snapshot)
         result_folder = acceptance.write_acceptance_report(selected)
         with ZipFile(result_folder / "supporto_collaudo.zip") as archive:

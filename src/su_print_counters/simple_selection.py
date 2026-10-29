@@ -94,6 +94,16 @@ def find_latest_snapshot(desktop, *, additional_locations=()):
     if folder.resolve(strict=True).parent != selected_root:
         raise ValueError("La copia più recente non si trova direttamente nella cartella controllata.")
     snapshot = folder / "snapshot.sqlite"
+    return validate_snapshot_file(snapshot)
+
+
+def validate_snapshot_file(snapshot):
+    """Verifica una copia selezionata senza dipendere dal nome della cartella."""
+    snapshot = Path(snapshot)
+    if snapshot.name.casefold() != "snapshot.sqlite":
+        raise ValueError("Selezionare il file snapshot.sqlite della copia di collaudo.")
+    folder = snapshot.parent
+    _plain_entry(folder, directory=True)
     schema = folder / "schema_collaudo.json"
     _plain_entry(snapshot)
     _plain_entry(schema)

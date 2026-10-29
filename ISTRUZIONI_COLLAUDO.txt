@@ -2,7 +2,7 @@ CENTRO RACCOLTA CONTATORI V1 - COLLAUDO DELLA COPIA REALE
 
 AVVIO SEMPLICE
 
-Apri AVVIA_COLLAUDO_CORRETTO.bat con doppio clic.
+Apri AVVIA_CONTATORI.bat con doppio clic.
 Trova da solo la copia piu' recente sul Desktop, prepara i risultati
 e apre la cartella con supporto_collaudo.zip gia' selezionato.
 Trascina quel file nella chat se ti e' stato richiesto il rapporto completo.
