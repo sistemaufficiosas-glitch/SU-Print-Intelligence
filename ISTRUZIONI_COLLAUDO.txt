@@ -3,11 +3,22 @@ CENTRO RACCOLTA CONTATORI V1 - COLLAUDO DELLA COPIA REALE
 1. Estrai tutto lo ZIP in una nuova cartella.
 2. Apri con doppio clic collaudo_reale_windows.bat.
 3. Seleziona lo snapshot.sqlite gia' creato sul Desktop e premi Apri.
-4. Attendi il messaggio Rapporti pronti, quindi premi OK.
-5. Nella cartella che si apre:
-   - apri risultati_contatori.html con doppio clic per vedere la tabella;
-   - allega in chat SOLO esito_collaudo.json;
-   - conserva risultati_contatori.json sul PC (contiene i dati completi).
+4. Attendi la finestra Collaudo da verificare: rimane aperta fino a Chiudi.
+5. Usa i pulsanti della finestra:
+   - Apri tabella: mostra risultati_contatori.html nel browser del PC;
+   - Apri cartella: ritrova i risultati senza cercarli sul Desktop;
+   - Copia riepilogo: copia solo l'esito filtrato, da incollare in chat con Ctrl+V;
+   - Chiudi: chiude il programma quando hai terminato.
+
+I risultati sono in una nuova cartella dentro quella dello snapshot.
+Per il normale collaudo condividi solo esito_collaudo.json o Copia riepilogo:
+contiene conteggi, codici, controlli tipizzati e l'hash della copia, senza record.
+
+Viene creato anche supporto_collaudo.zip, che contiene il rapporto completo
+risultati_contatori.json, esito_collaudo.json e LEGGIMI.txt. Lo ZIP contiene
+matricole, contatori, storico e anomalie con i dettagli del rapporto completo.
+Conservalo sul PC e invialo soltanto se richiesto per un approfondimento.
+Lo ZIP non contiene snapshot.sqlite e non viene caricato in rete dal programma.
 
 Lo stato e' COLLAUDO DA VERIFICARE: confrontiamo i dati con casi noti prima
 delle integrazioni. Il totale e' dichiarato dal vecchio sistema e richiede

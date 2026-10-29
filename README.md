@@ -4,7 +4,11 @@ Motore Python indipendente dal gestionale. Legge esclusivamente uno snapshot SQL
 autonomo e restituisce un report JSON. Nessuna integrazione con Panoramica,
 Contratti, Monitoraggio o Cartella Tecnica è inclusa.
 
-Versione 1.1.0: adattatore del registro reale Remote Agent, ricavato dallo schema,
+Versione 1.1.1: dettagli delle anomalie con macchina, matricole e valori di
+confronto; controllo di coerenza fra letture parziali; finestra dei risultati
+persistente e archivio di supporto compresso automaticamente.
+
+Adattatore del registro reale Remote Agent, ricavato dallo schema,
 dalla diagnostica e dai sorgenti di ricezione forniti per la revisione. Il risultato
 resta `REVIEW_REQUIRED` fino al confronto delle letture con casi noti. Vedere
 `docs/REGOLE_ADATTATORE.md` per filtri, cronologia, esclusioni e limiti del totale.
@@ -49,6 +53,12 @@ telemetrie e crea una nuova cartella `Risultati_Contatori_V1_*` accanto alla cop
 | `risultati_contatori.json` | Storico completo controllato, macchine escluse, ultime letture per contatore e anomalie; contiene dati da conservare sul PC |
 | `esito_collaudo.json` | Solo conteggi, codici, controlli booleani e impronta della copia, da condividere per proseguire il collaudo |
 | `LEGGIMI.txt` | Istruzioni e limiti del controllo |
+| `supporto_collaudo.zip` | Rapporto completo, riepilogo e istruzioni compressi; contiene dati privati e va inviato solo se richiesto per l'approfondimento |
+
+La finestra finale rimane aperta con i pulsanti **Apri tabella**, **Apri cartella**,
+**Copia riepilogo** e **Chiudi**. La copia negli appunti include solo l'esito
+filtrato, anche se al file sono stati aggiunti campi estranei. Il programma non
+trasmette in rete lo ZIP o altri risultati.
 
 L'HTML è un file statico locale, senza risorse di rete o codice proveniente dal
 database. Non sostituisce il confronto con il contatore della macchina. I contatori
@@ -63,6 +73,12 @@ Il motore applica un limite di tre minuti e consente l'annullamento; la successi
 serializzazione dei risultati può richiedere altro tempo. In caso di errore o
 annullamento elimina solo la propria cartella incompleta. Nessuna scrittura sul
 database, importazione dei servizi originali o integrazione nel gestionale.
+
+Le anomalie delle letture includono ora un `context` privato: identità della
+macchina, matricole da confrontare, contatori respinti, metrica in regressione e
+valore/ID precedente, oppure i record coinvolti nel conflitto. I gruppi molto grandi
+mostrano fino a 20 record e dichiarano il taglio. Non vengono copiati payload
+integrali, chiavi o campi estranei; il contesto rimane fuori dall'esito condivisibile.
 
 ## Preparare la copia sul PC Windows
 

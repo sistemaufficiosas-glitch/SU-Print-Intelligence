@@ -40,6 +40,38 @@ def _iso(value):
     return datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
 
 
+def _audit_text(value, limit=256):
+    return value[:limit] if isinstance(value, str) else None
+
+
+def _audit_counter(value):
+    if type(value) is float and not math.isfinite(value):
+        return {"type": "float", "finite": False}
+    if value is None or type(value) in (int, float, bool):
+        return value
+    # Non copiare oggetti, liste o valori liberi inseriti in un campo numerico.
+    return {"type": type(value).__name__}
+
+
+def _candidate_context(pid, printer, row):
+    return {
+        "reading_id": row["reading_id"], "printer_id": pid, "agent_id": row["agent_id"],
+        "inventory_serial": _audit_text(printer["serial_number"]),
+        "declared_serial_matches_inventory": True,
+        "received_at_utc": row["received_at"], "collected_at": row["collected_at"],
+        "counters": {key: row[key] for key in METRICS},
+        "currently_authorized": row["currently_authorized"],
+    }
+
+
+def _baseline_context(keys, baseline, origins):
+    return {
+        key: {"value": baseline[key], "reading_id": origins[key]["reading_id"],
+              "received_at_utc": origins[key]["received_at"], "agent_id": origins[key]["agent_id"]}
+        for key in keys
+    }
+
+
 def collect_real(database, *, now=None, cancel=None, timeout_seconds=180.0):
     """Controlla il registro accettato, conservando storia e anomalie separatamente.
 
@@ -77,8 +109,11 @@ def collect_real(database, *, now=None, cancel=None, timeout_seconds=180.0):
             fingerprint.update(chunk)
     anomalies = []
 
-    def issue(code, kind, entity_id, detail):
-        anomalies.append({"code": code, "entity_type": kind, "entity_id": entity_id, "detail": detail})
+    def issue(code, kind, entity_id, detail, context=None):
+        item = {"code": code, "entity_type": kind, "entity_id": entity_id, "detail": detail}
+        if context is not None:
+            item["context"] = dict(context)
+        anomalies.append(item)
 
     candidates = defaultdict(list)
     source_telemetry = 0
@@ -175,9 +210,14 @@ def collect_real(database, *, now=None, cancel=None, timeout_seconds=180.0):
                 if type(rid) is not int or rid <= 0 or rid in seen_readings:
                     raise ValueError("Identificativi telemetria nulli o duplicati")
                 seen_readings.add(rid)
+                context = {
+                    "printer_id": pid, "agent_id": aid,
+                    "inventory_serial": _audit_text(printers.get(pid, {}).get("serial_number")),
+                    "received_at": _audit_text(row["received_at"], 80),
+                }
 
                 def reject(code, detail):
-                    issue(code, "reading", rid, detail)
+                    issue(code, "reading", rid, detail, context)
 
                 if type(row["accepted"]) is not int or row["accepted"] != 1:
                     reject("REJECTED_TELEMETRY", "Messaggio non accettato dal registro centrale")
@@ -198,6 +238,15 @@ def collect_real(database, *, now=None, cancel=None, timeout_seconds=180.0):
                 except (ValueError, RecursionError):
                     reject("INVALID_JSON", "Payload JSON non valido o ambiguo")
                     continue
+                context.update({
+                    "declared_serial": _audit_text(payload.get("serial_number")),
+                    "collected_at": _audit_text(payload.get("collected_at"), 80),
+                    "counters": {
+                        "black_counter": _audit_counter(payload.get("black_counter")),
+                        "color_counter": _audit_counter(payload.get("color_counter")),
+                        "total_counter": _audit_counter(payload.get("total_counter_candidate")),
+                    },
+                })
                 if type(payload.get("printer_id")) is not int or payload["printer_id"] != pid:
                     reject("PRINTER_ID_MISMATCH", "Identità macchina discordante tra riga e payload")
                     continue
@@ -255,19 +304,45 @@ def collect_real(database, *, now=None, cancel=None, timeout_seconds=180.0):
             groups[row["received_at"]].append(row)
         history = []
         baseline = {}
+        origins = {}
         for stamp, group in sorted(groups.items()):
             check()
-            if any(len({row[key] for row in group if row[key] is not None}) > 1 for key in METRICS):
+            values_at_stamp = {key: {row[key] for row in group if row[key] is not None} for key in METRICS}
+            conflicting = [key for key in METRICS if len(values_at_stamp[key]) > 1]
+            unique_total = next(iter(values_at_stamp["total_counter"])) if len(values_at_stamp["total_counter"]) == 1 else None
+            incompatible = [key for key in ("black_counter", "color_counter")
+                            if unique_total is not None and any(value > unique_total for value in values_at_stamp[key])]
+            if conflicting or incompatible:
+                peers = [{"reading_id": row["reading_id"], "agent_id": row["agent_id"],
+                          "collected_at": row["collected_at"], "counters": {key: row[key] for key in METRICS}}
+                         for row in sorted(group, key=lambda item: item["reading_id"])[:20]]
                 for row in group:
-                    issue("CONFLICTING_READING", "reading", row["reading_id"], "Contatori discordanti allo stesso istante di ricezione")
+                    check()
+                    context = _candidate_context(pid, printer, row)
+                    context.update({"group_size": len(group),
+                                    "conflicting_metrics": sorted(set(conflicting + (incompatible + ["total_counter"] if incompatible else []))),
+                                    "conflict_peers": peers, "conflict_peers_truncated": len(group) > 20})
+                    issue("CONFLICTING_READING", "reading", row["reading_id"], "Contatori discordanti o incompatibili allo stesso istante di ricezione", context)
                 continue
             for row in sorted(group, key=lambda r: r["reading_id"]):
                 check()
-                if any(row[key] is not None and key in baseline and row[key] < baseline[key] for key in METRICS):
-                    issue("COUNTER_REGRESSION", "reading", row["reading_id"], "Un contatore scende rispetto al precedente valore accettato")
+                regressed = [key for key in METRICS if row[key] is not None and key in baseline and row[key] < baseline[key]]
+                if regressed:
+                    context = _candidate_context(pid, printer, row)
+                    context.update({"regressed_metrics": regressed, "baseline": _baseline_context(regressed, baseline, origins)})
+                    issue("COUNTER_REGRESSION", "reading", row["reading_id"], "Un contatore scende rispetto al precedente valore accettato", context)
+                    continue
+                incompatible = [key for key in ("black_counter", "color_counter")
+                                if row["total_counter"] is not None and key in baseline and row["total_counter"] < baseline[key]]
+                if incompatible:
+                    context = _candidate_context(pid, printer, row)
+                    context.update({"inconsistent_metrics": ["total_counter"] + incompatible,
+                                    "baseline": _baseline_context(incompatible, baseline, origins)})
+                    issue("INCONSISTENT_COUNTERS", "reading", row["reading_id"], "Totale nuovo inferiore a una componente già rilevata", context)
                     continue
                 history.append(row)
                 baseline.update({key: row[key] for key in METRICS if row[key] is not None})
+                origins.update({key: row for key in METRICS if row[key] is not None})
         usable = [row for row in history if row["currently_authorized"]]
         item = {"printer_id": pid, "serial": serial(printer["serial_number"]), "history": history,
                 "latest": usable[-1] if usable else None,

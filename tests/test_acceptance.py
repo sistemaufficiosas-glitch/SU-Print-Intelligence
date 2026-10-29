@@ -6,9 +6,10 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
+from zipfile import ZipFile
 
-from su_print_counters.acceptance import render_html, shareable_summary, write_acceptance_report
+from su_print_counters.acceptance import copy_summary_to_clipboard, render_html, shareable_summary, write_acceptance_report
 from su_print_counters.snapshot import SnapshotCancelled
 
 
@@ -93,7 +94,7 @@ class AcceptanceTests(unittest.TestCase):
         self.assertNotEqual(first, second)
         self.assertEqual(first.parent, self.root)
         self.assertEqual(set(first_files), {"risultati_contatori.json", "esito_collaudo.json",
-                                            "risultati_contatori.html", "LEGGIMI.txt"})
+                                            "risultati_contatori.html", "LEGGIMI.txt", "supporto_collaudo.zip"})
         self.assertEqual({p.name: p.read_bytes() for p in first.iterdir()}, first_files)
         self.assertEqual(json.loads((first / "risultati_contatori.json").read_text(encoding="utf-8")), self.report)
         self.assertEqual(hashlib.sha256(self.snapshot.read_bytes()).digest(), digest)
@@ -160,6 +161,50 @@ class AcceptanceTests(unittest.TestCase):
                 write_acceptance_report(active)
         collector.assert_not_called()
         self.assertEqual(active.read_bytes(), before)
+
+    def test_support_zip_is_complete_and_summary_omits_private_audit_context(self):
+        self.report["anomalies"][0]["context"] = {"declared_serial": "PRIVATE_MISMATCH_SERIAL", "counters": {"black_counter": 987654321}}
+        with patch("su_print_counters.acceptance.collect_real", return_value=self.report):
+            folder = write_acceptance_report(self.snapshot)
+        with ZipFile(folder / "supporto_collaudo.zip") as archive:
+            self.assertIsNone(archive.testzip())
+            self.assertEqual(set(archive.namelist()), {"risultati_contatori.json", "esito_collaudo.json", "LEGGIMI.txt"})
+            self.assertIn("PRIVATE_MISMATCH_SERIAL", archive.read("risultati_contatori.json").decode())
+            shared = archive.read("esito_collaudo.json").decode()
+            self.assertNotIn("PRIVATE_MISMATCH_SERIAL", shared)
+            self.assertNotIn("987654321", shared)
+            self.assertNotIn("context", shared)
+
+    def test_clipboard_filters_unexpected_fields_in_summary_file(self):
+        folder = self.root / "results"
+        folder.mkdir()
+        original = dict(shareable_summary(self.report), context={"serial": "PRIVATE_MISMATCH_SERIAL"},
+                        checks={"total_origin_verified": False, "serial": "PRIVATE_MISMATCH_SERIAL"})
+        (folder / "esito_collaudo.json").write_text(json.dumps(original), encoding="utf-8")
+        clipboard = Mock()
+        copy_summary_to_clipboard(clipboard, folder)
+        clipboard.clipboard_clear.assert_called_once()
+        shared = json.loads(clipboard.clipboard_append.call_args.args[0])
+        self.assertEqual(shared["checks"], {"total_origin_verified": False})
+        self.assertNotIn("PRIVATE_MISMATCH_SERIAL", json.dumps(shared))
+
+    def test_cancel_during_zip_creation_closes_handles_and_cleans_only_own_folder(self):
+        cancel = threading.Event()
+        original_open = ZipFile.open
+
+        def opening(archive, name, mode="r", *args, **kwargs):
+            handle = original_open(archive, name, mode, *args, **kwargs)
+            if mode == "w":
+                cancel.set()
+            return handle
+
+        before = set(self.root.iterdir())
+        with patch("su_print_counters.acceptance.collect_real", return_value=self.report), \
+                patch.object(ZipFile, "open", autospec=True, side_effect=opening):
+            with self.assertRaises(SnapshotCancelled):
+                write_acceptance_report(self.snapshot, cancel=cancel)
+        self.assertEqual(set(self.root.iterdir()), before)
+        self.assertEqual(self.marker.read_text(encoding="utf-8"), "da conservare")
 
 
 if __name__ == "__main__":

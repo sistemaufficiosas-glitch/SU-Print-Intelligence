@@ -10,6 +10,7 @@ import tempfile
 import threading
 from collections import Counter
 from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from .snapshot import SnapshotCancelled, desktop_directory
 
@@ -129,13 +130,16 @@ senza fuso; non viene reinterpretato automaticamente come ora locale o UTC.</li>
 <li>Storico, ultime letture per singolo contatore, macchine escluse e anomalie sono nel file
 <strong>risultati_contatori.json</strong>, da conservare sul PC.</li>
 <li>Il file <strong>esito_collaudo.json</strong> contiene solo conteggi e codici e può essere usato
-per proseguire il collaudo. Nessuna integrazione con il gestionale è stata eseguita.</li></ul>
+per proseguire il collaudo. Nessuna integrazione con il gestionale è stata eseguita.</li>
+<li><strong>supporto_collaudo.zip</strong> contiene il rapporto completo, con matricole, contatori,
+storico e anomalie. Condividerlo solo se richiesto; per il normale riepilogo usare
+<strong>esito_collaudo.json</strong> oppure il pulsante Copia riepilogo nella finestra del programma.</li></ul>
 </body></html>
 """
 
 
 def write_acceptance_report(snapshot, *, cancel=None):
-    """Crea quattro file in una cartella propria, senza modificare lo snapshot."""
+    """Crea i rapporti e il loro ZIP in una cartella propria; non modifica la copia."""
     cancel = cancel if cancel is not None else threading.Event()
 
     def check():
@@ -162,6 +166,8 @@ def write_acceptance_report(snapshot, *, cancel=None):
                 "Le date di raccolta senza fuso non vengono reinterpretate automaticamente.\n\n"
                 "Allega in chat SOLO esito_collaudo.json (conteggi e codici).\n"
                 "Conserva risultati_contatori.json sul PC: contiene matricole, contatori e storico.\n"
+                "supporto_collaudo.zip contiene il rapporto completo, con questi dati e le anomalie.\n"
+                "Invia lo ZIP solo se richiesto; il riepilogo senza record resta la scelta normale.\n"
                 "Lo snapshot e il programma attivo non sono stati modificati dal collaudo.\n"
             ),
         }
@@ -169,6 +175,19 @@ def write_acceptance_report(snapshot, *, cancel=None):
             check()
             with (folder / name).open("x", encoding="utf-8") as stream:
                 stream.write(content)
+        # Lo ZIP evita di trasferire un JSON completo molto grande; resta privato.
+        # Nomi fissi: niente snapshot, file esterni o percorsi presi dal database.
+        with ZipFile(folder / "supporto_collaudo.zip", mode="x", compression=ZIP_DEFLATED, compresslevel=9) as archive:
+            for name in ("risultati_contatori.json", "esito_collaudo.json", "LEGGIMI.txt"):
+                check()
+                with (folder / name).open("rb") as source, archive.open(name, "w") as target:
+                    for chunk in iter(lambda: source.read(64 * 1024), b""):
+                        check()
+                        target.write(chunk)
+        check()
+        with ZipFile(folder / "supporto_collaudo.zip") as archive:
+            if archive.testzip() is not None:
+                raise ValueError("Il pacchetto di supporto non ha superato la verifica di integrità")
         check()
         return folder
     except BaseException as error:
@@ -177,6 +196,77 @@ def write_acceptance_report(snapshot, *, cancel=None):
         except OSError as cleanup_error:
             raise RuntimeError(f"Risultati incompleti da rimuovere: {folder}. {cleanup_error}") from error
         raise
+
+
+def copy_summary_to_clipboard(root, folder):
+    """Solo l'esito filtrato negli appunti, anche se il file è stato ampliato a mano."""
+    with (Path(folder) / "esito_collaudo.json").open(encoding="utf-8") as stream:
+        original = json.load(stream)
+    if not isinstance(original, dict):
+        raise ValueError("Il riepilogo non ha il formato previsto")
+    shared = shareable_summary(original)
+    checks = original.get("checks")
+    if isinstance(checks, dict):
+        shared["checks"] = {
+            key: checks[key] for key in (
+                "naive_receipt_utc_default_confirmed", "total_origin_verified", "offline_hmac_rechecked"
+            ) if type(checks.get(key)) is bool
+        }
+    text = json.dumps(shared, ensure_ascii=False, indent=2) + "\n"
+    root.clipboard_clear()
+    root.clipboard_append(text)
+
+
+def _open_output(root, path):
+    from tkinter import messagebox
+
+    if os.name == "nt":
+        try:
+            os.startfile(str(path))
+            return
+        except OSError as error:
+            messagebox.showerror("Impossibile aprire il risultato", str(error), parent=root)
+    else:
+        messagebox.showinfo("Percorso del risultato", str(path), parent=root)
+
+
+def show_completed_report(root, folder):
+    """Lasciare risultati e azioni disponibili finché l'utente chiude la finestra."""
+    from tkinter import TclError, messagebox, ttk
+
+    folder = Path(folder)
+    root.title("SU Print — Collaudo da verificare")
+    root.protocol("WM_DELETE_WINDOW", root.destroy)
+    frame = ttk.Frame(root, padding=20)
+    frame.pack(fill="both", expand=True)
+    ttk.Label(frame, text="COLLAUDO DA VERIFICARE", font=("Segoe UI", 13)).pack(anchor="w")
+    ttk.Label(frame, text="I rapporti sono pronti. Puoi aprirli da questa finestra.", wraplength=600).pack(anchor="w", pady=10)
+    ttk.Label(frame, text=f"Cartella dei risultati:\n{folder}", wraplength=600).pack(anchor="w", pady=5)
+    feedback = ttk.Label(frame, text="Per la chat usa Copia riepilogo oppure allega esito_collaudo.json.", wraplength=600)
+    feedback.pack(anchor="w", pady=10)
+    ttk.Label(
+        frame, text="supporto_collaudo.zip contiene matricole, contatori, storico e anomalie del rapporto completo. Invialo solo se richiesto.",
+        wraplength=600,
+    ).pack(anchor="w", pady=5)
+
+    def copy_summary():
+        try:
+            copy_summary_to_clipboard(root, folder)
+        except (OSError, ValueError, TypeError, TclError) as error:
+            messagebox.showerror("Riepilogo non copiato", str(error), parent=root)
+        else:
+            feedback.configure(text="Riepilogo copiato. Incollalo nella chat con Ctrl+V.")
+
+    actions = ttk.Frame(frame)
+    actions.pack(anchor="w", pady=15)
+    for label, action in (
+        ("Apri tabella", lambda: _open_output(root, folder / "risultati_contatori.html")),
+        ("Apri cartella", lambda: _open_output(root, folder)),
+        ("Copia riepilogo", copy_summary),
+        ("Chiudi", root.destroy),
+    ):
+        ttk.Button(actions, text=label, command=action).pack(side="left", padx=4)
+    root.deiconify()
 
 
 def main():
@@ -196,8 +286,11 @@ def main():
         root.destroy()
         return 0
     root.title("SU Print — Collaudo delle letture")
-    ttk.Label(root, text="Controllo delle telemetrie sulla copia locale.\nAttendere…", padding=20).pack()
-    bar = ttk.Progressbar(root, mode="indeterminate", length=420)
+    pending = ttk.Frame(root, padding=20)
+    pending.pack()
+    progress_label = ttk.Label(pending, text="Controllo delle telemetrie sulla copia locale.\nAttendere…")
+    progress_label.pack()
+    bar = ttk.Progressbar(pending, mode="indeterminate", length=420)
     bar.pack(padx=20, pady=10)
     bar.start()
     messages = queue.Queue()
@@ -207,8 +300,9 @@ def main():
     def request_cancel():
         cancel.set()
         button.configure(state="disabled")
+        progress_label.configure(text="Annullamento in corso. Attendere la chiusura dei file.")
 
-    button = ttk.Button(root, text="Annulla", command=request_cancel)
+    button = ttk.Button(pending, text="Annulla", command=request_cancel)
     button.pack(pady=15)
     root.protocol("WM_DELETE_WINDOW", request_cancel)
 
@@ -225,22 +319,13 @@ def main():
             root.after(100, poll)
             return
         bar.stop()
-        root.withdraw()
         if kind == "done":
             outcome[0] = 0
-            messagebox.showinfo(
-                "Rapporti pronti — collaudo da verificare",
-                "I rapporti sono stati creati.\n\n"
-                "Apri risultati_contatori.html per vedere le letture.\n"
-                "Allega in chat SOLO esito_collaudo.json.\n"
-                "Conserva il JSON completo sul PC.\n\nPremi OK per aprire la cartella.", parent=root,
-            )
-            if os.name == "nt":
-                try:
-                    os.startfile(str(value))
-                except OSError:
-                    messagebox.showinfo("Cartella dei risultati", str(value), parent=root)
-        elif isinstance(value, SnapshotCancelled):
+            pending.destroy()
+            show_completed_report(root, value)
+            return
+        root.withdraw()
+        if isinstance(value, SnapshotCancelled):
             outcome[0] = 0
             messagebox.showinfo("Annullato", str(value), parent=root)
         else:

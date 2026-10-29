@@ -38,6 +38,11 @@ Il totale dichiarato, se presente, non può essere inferiore a una componente.
 Non vengono calcolate somme, massimi o conversioni di unità. Ogni regressione
 rispetto al precedente valore controllato di uno qualsiasi dei contatori respinge
 la riga. Un contatore assente in una lettura intermedia non azzera il baseline.
+Un nuovo totale deve anche essere almeno pari a ciascuna componente già rilevata,
+anche se la nuova riga non la ripete. Il controllo è direzionale: una nuova
+componente può superare un totale più vecchio non riletto. Fra righe complementari
+dello stesso istante, un totale inferiore a una componente mette il gruppo in
+quarantena. Queste condizioni non ricostruiscono contatori assenti.
 Nessun reset o sostituzione viene riconosciuto automaticamente.
 
 **Limite del totale:** il codice Pilot esaminato può riempire il candidato con
@@ -87,6 +92,15 @@ di identità o di riassociazione. Le macchine prive di un'ultima lettura utilizz
 sono escluse da `printers`, ma restano in `archive` con motivazione e storico
 controllato, quando disponibile. Le righe rifiutate rimangono nello snapshot;
 il report ne conserva codice e ID per l'audit.
+
+Il `context` delle anomalie rende il confronto verificabile: ID macchina e Agent,
+matricola anagrafica e dichiarata quando discordanti, valori osservati, metriche
+scese e precedente baseline con ID/data/Agent. Per un candidato già validato non
+si fabbrica una matricola dichiarata copiando l'anagrafica: si espone invece il
+risultato del confronto già eseguito. I conflitti includono fino a 20 record del
+gruppo e dichiarano eventuali tagli. I campi testuali del contesto sono limitati
+a 256 caratteri (80 per le date sorgente). Questi dettagli sono privati e non
+entrano nel riepilogo o negli appunti.
 
 ## Esito del collaudo
 
