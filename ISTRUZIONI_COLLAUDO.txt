@@ -1,5 +1,15 @@
 CENTRO RACCOLTA CONTATORI V1 - COLLAUDO DELLA COPIA REALE
 
+AVVIO SEMPLICE
+
+Apri AVVIA_COLLAUDO_SEMPLICE.bat con doppio clic.
+Trova da solo la copia piu' recente sul Desktop, prepara i risultati
+e apre la cartella con supporto_collaudo.zip gia' selezionato.
+Trascina quel file nella chat se ti e' stato richiesto il rapporto completo.
+Non occorre estrarre altri file o scegliere il database.
+
+AVVIO CON SCELTA MANUALE DELLA COPIA
+
 1. Estrai tutto lo ZIP in una nuova cartella.
 2. Apri con doppio clic collaudo_reale_windows.bat.
 3. Seleziona lo snapshot.sqlite gia' creato sul Desktop e premi Apri.

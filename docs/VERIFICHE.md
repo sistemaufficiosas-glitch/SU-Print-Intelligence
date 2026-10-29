@@ -1,8 +1,8 @@
-# Verifiche della versione 1.1.1
+# Verifiche della versione 1.1.2
 
 ## Test automatici
 
-La suite completa contiene 98 test eseguiti con successo nell'ambiente Linux.
+La suite completa contiene 121 test eseguiti con successo nell'ambiente Linux.
 Include il contratto di riferimento, backup WAL, diagnostica, indice dei sorgenti,
 adattatore reale, CLI e generazione dei rapporti. I controlli SQLite conservano
 riferimenti alle connessioni per rilevare handle lasciati aperti anche su Linux;
@@ -24,6 +24,14 @@ letture ammesse del rapporto reale ricevuto. Sono inoltre verificati contesto
 degli scarti, baseline corretta, limitazione dei gruppi, privacy del riepilogo e
 degli appunti, integrità ZIP e pulizia in caso di annullamento della compressione.
 
+L'avvio semplice aggiunge controlli sulla scelta della copia guidata più recente,
+senza ripiego su copie vecchie quando quella nuova è incompleta, ambigua o contiene
+collegamenti e sidecar. Sono verificati anche archivio incorporato identico ai
+sorgenti, riproducibilità, caricamento isolato da percorsi con spazi e accenti,
+avvio senza selettore manuale e apertura Explorer con argomenti separati. Una
+pipeline sintetica completa seleziona la copia, raccoglie i dati e controlla lo
+ZIP e l'impronta invariata del database.
+
 ## Prova rappresentativa di capacità
 
 Con la versione 1.1.0 è stata eseguita la pipeline SQLite → adattatore → quattro file su
@@ -40,11 +48,17 @@ non avvia elaborazioni parallele.
 
 ## Verifiche ancora necessarie
 
-Il primo nucleo di 15 test, il backup guidato, la diagnostica e il collaudo 1.1.0
-sono stati eseguiti dal cliente su Windows, con risultati ricevuti in chat. Il
-rapporto reale è stato analizzato e le invarianti verificabili risultano coerenti.
-Il confronto fisico dei contatori resta distinto da queste verifiche. La nuova
-finestra persistente e il contesto degli scarti della 1.1.1 restano da provare sul
-PC Windows; il database completo non è stato caricato qui.
+Il primo nucleo di 15 test, il backup guidato, la diagnostica e i collaudi 1.1.0 e
+1.1.1 sono stati eseguiti dal cliente su Windows, con rapporti ricevuti in chat.
+Il rapporto 1.1.1 include il contesto degli scarti e lo ZIP automatico. Le
+invarianti verificabili risultano coerenti. Un riscontro fotografico su una
+macchina è compatibile con la progressione dei contatori, ma non è una misurazione
+contemporanea e non spiega le anomalie storiche. Il confronto fisico resta
+distinto dai test delle regole; il database completo non è stato caricato qui.
+
+Il nuovo avvio unico 1.1.2 deve ancora essere eseguito sul PC Windows. Il formato
+zipapp e l'isolamento sono stati verificati su Linux con Python 3.12, mentre la
+parte batch e l'apertura effettiva di Explorer richiedono Windows. I test GUI
+verificano il flusso con componenti simulati, non l'aspetto nativo della finestra.
 
 Nessuna integrazione o modifica del database operativo è stata eseguita.

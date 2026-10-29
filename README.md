@@ -4,9 +4,9 @@ Motore Python indipendente dal gestionale. Legge esclusivamente uno snapshot SQL
 autonomo e restituisce un report JSON. Nessuna integrazione con Panoramica,
 Contratti, Monitoraggio o Cartella Tecnica è inclusa.
 
-Versione 1.1.1: dettagli delle anomalie con macchina, matricole e valori di
-confronto; controllo di coerenza fra letture parziali; finestra dei risultati
-persistente e archivio di supporto compresso automaticamente.
+Versione 1.1.2: avvio Windows in un solo file, con scelta automatica della copia
+più recente e apertura del file di supporto già selezionato. Mantiene dettagli
+delle anomalie, controllo delle letture parziali e archivio compresso.
 
 Adattatore del registro reale Remote Agent, ricavato dallo schema,
 dalla diagnostica e dai sorgenti di ricezione forniti per la revisione. Il risultato
@@ -20,6 +20,32 @@ per mostrare il risultato fino alla pressione di un tasto.
 
 Richiede Python 3.11 o successivo; non usa librerie esterne in esecuzione.
 I launcher Windows richiedono Python 3.11 e il launcher `py` installato.
+
+### Avvio semplice per il collaudo già avviato
+
+Scaricare `AVVIA_COLLAUDO_SEMPLICE.bat` e aprirlo con doppio clic. Il file contiene
+già il pacchetto Python: non occorre estrarre, installare o cercare altri file.
+Durante l'esecuzione non scarica codice o dati dalla rete.
+
+Trova sul Desktop effettivo la cartella `SU_Print_Collaudo_*` più recente, usando
+la data nel nome generato dal nostro strumento di copia. Richiede una copia
+completata con `schema_collaudo.json` e `snapshot.sqlite`, senza collegamenti o
+sidecar. Se la più recente è incompleta o due copie hanno la stessa data di
+creazione, segnala il problema senza usare di nascosto una copia più vecchia.
+La verifica completa della copia rimane affidata all'adattatore in sola lettura.
+
+Prepara i rapporti accanto alla copia e apre Esplora file con
+`supporto_collaudo.zip` selezionato. La finestra resta aperta con il pulsante
+**Mostra file da inviare**. L'invio avviene solo quando l'utente allega il file.
+Questa modalità serve al collaudo per cui è stato richiesto il rapporto completo,
+che contiene matricole, contatori e storico. Non crea un'altra copia del database.
+
+L'avvio è un batch con archivio zipapp Python incorporato, creato da
+`python tools/build_simple_launcher.py`. Il comando termina prima dell'archivio;
+Python lo esegue in modalità isolata. Non scrive codice in cartelle del gestionale.
+
+### Avvio dalla cartella del pacchetto
+
 Da una cartella estratta del pacchetto:
 
 ```bat

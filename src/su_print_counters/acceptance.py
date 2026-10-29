@@ -6,6 +6,7 @@ import os
 import queue
 import re
 import shutil
+import subprocess
 import tempfile
 import threading
 from collections import Counter
@@ -230,8 +231,48 @@ def _open_output(root, path):
         messagebox.showinfo("Percorso del risultato", str(path), parent=root)
 
 
-def show_completed_report(root, folder):
+def show_support_archive(root, folder):
+    """Mostra il solo file da allegare, senza eseguire comandi tramite shell."""
+    from tkinter import messagebox
+
+    target = Path(folder) / "supporto_collaudo.zip"
+    if os.name == "nt":
+        try:
+            subprocess.Popen(["explorer.exe", "/select,", str(target)])
+            return
+        except OSError as error:
+            messagebox.showerror("File non aperto", str(error), parent=root)
+    else:
+        messagebox.showinfo("File da inviare", str(target), parent=root)
+
+
+def show_simple_completed_report(root, folder):
+    from tkinter import ttk
+
+    root.title("SU Print — File pronto da inviare")
+    root.protocol("WM_DELETE_WINDOW", root.destroy)
+    frame = ttk.Frame(root, padding=24)
+    frame.pack(fill="both", expand=True)
+    ttk.Label(frame, text="IL FILE È PRONTO", font=("Segoe UI", 15)).pack(anchor="w")
+    ttk.Label(
+        frame, text="Trascina supporto_collaudo.zip dalla cartella aperta a questa chat.",
+        wraplength=520,
+    ).pack(anchor="w", pady=14)
+    ttk.Label(
+        frame, text="Il file contiene i risultati da controllare: matricole, contatori e storico.",
+        wraplength=520,
+    ).pack(anchor="w", pady=6)
+    ttk.Button(frame, text="Mostra file da inviare", command=lambda: show_support_archive(root, folder)).pack(fill="x", pady=12)
+    ttk.Button(frame, text="Chiudi", command=root.destroy).pack(anchor="e")
+    root.deiconify()
+    root.after(200, lambda: show_support_archive(root, folder))
+
+
+def show_completed_report(root, folder, *, simple=False):
     """Lasciare risultati e azioni disponibili finché l'utente chiude la finestra."""
+    if simple:
+        show_simple_completed_report(root, folder)
+        return
     from tkinter import TclError, messagebox, ttk
 
     folder = Path(folder)
@@ -269,19 +310,29 @@ def show_completed_report(root, folder):
     root.deiconify()
 
 
-def main():
+def main(*, automatic=False):
     import tkinter as tk
     from tkinter import filedialog, messagebox, ttk
 
     root = tk.Tk()
     root.withdraw()
-    desktop = desktop_directory()
-    copies = sorted((p for p in desktop.glob("SU_Print_Collaudo_*") if p.is_dir()), key=lambda p: p.name)
-    selected = filedialog.askopenfilename(
-        parent=root, title="Seleziona snapshot.sqlite per il collaudo delle letture",
-        initialdir=str(copies[-1] if copies else desktop), initialfile="snapshot.sqlite",
-        filetypes=[("Copia di collaudo", "snapshot.sqlite")],
-    )
+    if automatic:
+        from .simple_selection import find_latest_snapshot
+
+        try:
+            selected = find_latest_snapshot(desktop_directory())
+        except (OSError, ValueError) as error:
+            messagebox.showerror("Copia non trovata", f"{error}\n\nMandami una foto di questa finestra per continuare.", parent=root)
+            root.destroy()
+            return 1
+    else:
+        desktop = desktop_directory()
+        copies = sorted((p for p in desktop.glob("SU_Print_Collaudo_*") if p.is_dir()), key=lambda p: p.name)
+        selected = filedialog.askopenfilename(
+            parent=root, title="Seleziona snapshot.sqlite per il collaudo delle letture",
+            initialdir=str(copies[-1] if copies else desktop), initialfile="snapshot.sqlite",
+            filetypes=[("Copia di collaudo", "snapshot.sqlite")],
+        )
     if not selected:
         root.destroy()
         return 0
@@ -290,6 +341,11 @@ def main():
     pending.pack()
     progress_label = ttk.Label(pending, text="Controllo delle telemetrie sulla copia locale.\nAttendere…")
     progress_label.pack()
+    if automatic:
+        from datetime import datetime
+
+        created = datetime.strptime(Path(selected).parent.name[len("SU_Print_Collaudo_"):len("SU_Print_Collaudo_") + 15], "%Y%m%d_%H%M%S")
+        ttk.Label(pending, text=f"Uso la copia del {created:%d/%m/%Y alle %H:%M}.").pack(pady=8)
     bar = ttk.Progressbar(pending, mode="indeterminate", length=420)
     bar.pack(padx=20, pady=10)
     bar.start()
@@ -322,7 +378,7 @@ def main():
         if kind == "done":
             outcome[0] = 0
             pending.destroy()
-            show_completed_report(root, value)
+            show_completed_report(root, value, simple=automatic)
             return
         root.withdraw()
         if isinstance(value, SnapshotCancelled):
